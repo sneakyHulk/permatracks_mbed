@@ -58,6 +58,8 @@ void setup() {
 			delay(10);
 		}
 	}
+	mmc5983ma.softReset();
+
 	Serial.println("MMC5983MA Found!");
 #endif
 
@@ -190,7 +192,7 @@ void setup() {
 	Serial.print("Continuous Mode set to: ");
 	Serial.println("true");
 #elifdef MMC5983MA
-	mmc5983ma.setFilterBandwidth(100);
+	mmc5983ma.setFilterBandwidth(400);
 	Serial.print("Filter Bandwidth set to: ");
 	Serial.println(mmc5983ma.getFilterBandwidth());
 
@@ -200,30 +202,30 @@ void setup() {
 
 	mmc5983ma.enableAutomaticSetReset();
 	Serial.print("Automatic Set Reset set to: ");
-	Serial.println("true");
+	Serial.println(mmc5983ma.isAutomaticSetResetEnabled() ? "enabled" : "disabled");
 
 	mmc5983ma.enableContinuousMode();
 	Serial.print("Continuous Mode set to: ");
-	Serial.println("true");
+	Serial.println(mmc5983ma.isContinuousModeEnabled() ? "enabled" : "disabled");
 #endif
-	// hard-iron calibrate sensor
+		// hard-iron calibrate sensor
 #ifdef MMC5983MA
-	//do {
-	//	uint32_t x_value = 0, y_value = 0, z_value = 0;
-	//	do {
-	//		delay(50);
-	//		mmc5983ma.readFieldsXYZ(&x_value, &y_value, &z_value);
-	//	} while (!sixDOF.deviantSpread(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)));
-	//	Serial.println("MMC5983MA read fields until deviantSpread!");
-	//} while (!sixDOF.calOffsets());
+		// do {
+		//	uint32_t x_value = 0, y_value = 0, z_value = 0;
+		//	do {
+		//		delay(50);
+		//		mmc5983ma.readFieldsXYZ(&x_value, &y_value, &z_value);
+		//	} while (!sixDOF.deviantSpread(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)));
+		//	Serial.println("MMC5983MA read fields until deviantSpread!");
+		// } while (!sixDOF.calOffsets());
 
 #elifdef LIS3MDL
-	// do {
-	//	do {
-	//		delay(50);
-	//		lis3mdl.read();
-	//	} while (!sixDOF.deviantSpread(lis3mdl.x, lis3mdl.y, lis3mdl.z));
-	// } while (!sixDOF.calOffsets());
+		// do {
+		//	do {
+		//		delay(50);
+		//		lis3mdl.read();
+		//	} while (!sixDOF.deviantSpread(lis3mdl.x, lis3mdl.y, lis3mdl.z));
+		// } while (!sixDOF.calOffsets());
 #elifdef MLX90393
 	// do {
 	//	int16_t x_value = 0, y_value = 0, z_value = 0;
@@ -252,10 +254,9 @@ void setup() {
 
 void loop() {
 #ifdef MMC5983MA
-	// TODO: check if new measurement is available
+
 	uint32_t x_value = 0, y_value = 0, z_value = 0;
-	mmc5983ma.readFieldsXYZ(&x_value, &y_value, &z_value);  // 18bit Operation
-	// mmc5983ma.clearMeasDoneInterrupt()
+	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return; // 18bit Operation
 
 	Serial.print("\tX: ");
 	Serial.print(static_cast<double>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
@@ -284,6 +285,4 @@ void loop() {
 	Serial.print(event.magnetic.z, 5);
 	Serial.println(" uTesla ");
 #endif
-
-	delay(100);
 }
