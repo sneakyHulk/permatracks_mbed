@@ -252,13 +252,36 @@ void setup() {
 	Serial.println("");
 }
 
+uint32_t next_heartbeat = 0;
+
+// double B[3]{0., 0., 0.};
+// double A_1[3][3]{1., 0., 0., 0., 1., 0., 0., 0., 1.};
+
 void loop() {
+	if (uint32_t const current_time = millis(); next_heartbeat < current_time) {  // sends heartbeat every second
+		next_heartbeat = current_time + 1000;
+
+		Serial.println("Heartbeat: 'MMC5983MA'");
+	}
+
 #ifdef MMC5983MA
-
 	uint32_t x_value = 0, y_value = 0, z_value = 0;
-	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return; // 18bit Operation
+	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return;  // 18bit Operation
 
-	Serial.print("\tX: ");
+	// hard-iron offset correction:
+	// x_value -= B[0];
+	// y_value -= B[1];
+	// z_value -= B[2];
+
+	// soft-iron offset correction:
+	// x_value = A_1[0][0] * x_value + A_1[0][1] * y_value + A_1[0][2] * z_value;
+	// y_value = A_1[1][0] * x_value + A_1[1][1] * y_value + A_1[1][2] * z_value;
+	// z_value = A_1[2][0] * x_value + A_1[2][1] * y_value + A_1[2][2] * z_value;
+
+	Serial.print('[');
+	Serial.print(millis());
+	Serial.print(']');
+	Serial.print(" \tX: ");
 	Serial.print(static_cast<double>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
 	Serial.print(" \tY: ");
 	Serial.print(static_cast<double>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
