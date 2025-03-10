@@ -63,9 +63,10 @@ void setup() {
 	Serial.println("MMC5983MA Found!");
 #endif
 
+	delay(5000);
 	// configure sensor
 #ifdef LIS3MDL
-	lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+	lis3mdl.setPerformanceMode(LIS3MDL_ULTRAHIGHMODE);
 	Serial.print("Performance mode set to: ");
 	switch (lis3mdl.getPerformanceMode()) {
 		case LIS3MDL_LOWPOWERMODE: Serial.println("Low"); break;
@@ -83,7 +84,7 @@ void setup() {
 		case LIS3MDL_POWERDOWNMODE: Serial.println("Power-down"); break;
 	}
 
-	lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
+	lis3mdl.setDataRate(LIS3MDL_DATARATE_80_HZ);
 	// You can check the datarate by looking at the frequency of the DRDY pin
 	Serial.print("Data rate set to: ");
 	switch (lis3mdl.getDataRate()) {
@@ -169,7 +170,7 @@ void setup() {
 	}
 
 	// Set digital filtering, see DIG_FILT at 16.2.5.
-	mlx90393.setFilter(MLX90393_FILTER_5);
+	mlx90393.setFilter(MLX90393_FILTER_2);
 	Serial.print("Filter set to: ");
 	switch (mlx90393.getFilter()) {
 		case MLX90393_FILTER_7: Serial.println("7");
@@ -254,58 +255,51 @@ void setup() {
 
 uint32_t next_heartbeat = 0;
 
-// double B[3]{0., 0., 0.};
-// double A_1[3][3]{1., 0., 0., 0., 1., 0., 0., 0., 1.};
+void send_message(float const x, float const y, float const z, const char* sensor_name, uint32_t const timestamp = millis()) {
+	Serial.print('[');
+	Serial.print(timestamp);
+	Serial.print("] ");
+	Serial.print(sensor_name);
+	Serial.print(": X=");
+	Serial.print(x, 5);
+	Serial.print(", Y=");
+	Serial.print(y, 5);
+	Serial.print(", Z=");
+	Serial.print(z, 5);
+	Serial.println('.');
+}
+
 
 void loop() {
 	if (uint32_t const current_time = millis(); next_heartbeat < current_time) {  // sends heartbeat every second
 		next_heartbeat = current_time + 1000;
 
-		Serial.println("Heartbeat: 'MMC5983MA'");
+		Serial.println("Heartbeat: 'Nucleo'");
 	}
 
 #ifdef MMC5983MA
 	uint32_t x_value = 0, y_value = 0, z_value = 0;
-	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return;  // 18bit Operation
+	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return;
 
-	// hard-iron offset correction:
-	// x_value -= B[0];
-	// y_value -= B[1];
-	// z_value -= B[2];
+	float x = static_cast<float>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA;
+	float y = static_cast<float>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA;
+	float z = static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA;
 
-	// soft-iron offset correction:
-	// x_value = A_1[0][0] * x_value + A_1[0][1] * y_value + A_1[0][2] * z_value;
-	// y_value = A_1[1][0] * x_value + A_1[1][1] * y_value + A_1[1][2] * z_value;
-	// z_value = A_1[2][0] * x_value + A_1[2][1] * y_value + A_1[2][2] * z_value;
-
-	Serial.print('[');
-	Serial.print(millis());
-	Serial.print(']');
-	Serial.print(" \tX: ");
-	Serial.print(static_cast<double>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
-	Serial.print(" \tY: ");
-	Serial.print(static_cast<double>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
-	Serial.print(" \tZ: ");
-	Serial.print(static_cast<double>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA, 5);
-	Serial.println(" uTesla ");
-#else
-	// Get a new sensor event, normalized to uTesla
+	send_message(x, y, z, "MMC5983MA");
+#elifdef LIS3MDL
 	sensors_event_t event;
-#ifdef LIS3MDL
 	lis3mdl.getEvent(&event);
-#elifdef MLX90393
-	mlx90393.getEvent(&event);
-#elifdef MMC5603
-	mmc5603.getEvent(&event);
-#endif
 
-	// Display the results (magnetic field is measured in uTesla)
-	Serial.print("\tX: ");
-	Serial.print(event.magnetic.x, 5);
-	Serial.print(" \tY: ");
-	Serial.print(event.magnetic.y, 5);
-	Serial.print(" \tZ: ");
-	Serial.print(event.magnetic.z, 5);
-	Serial.println(" uTesla ");
+	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "LIS3MDL");
+#elifdef MLX90393
+	sensors_event_t event;
+	mlx90393.getEvent(&event);
+
+	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "MLX90393");
+#elifdef MMC5603
+	sensors_event_t event;
+	mmc5603.getEvent(&event);
+
+	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "MMC5603");
 #endif
 }
