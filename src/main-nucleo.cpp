@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Comp6DOF_n0m1.h>
-Comp6DOF_n0m1 sixDOF;
 
 #ifdef LIS3MDL
 #include <Adafruit_LIS3MDL.h>
@@ -193,13 +192,17 @@ void setup() {
 	Serial.print("Continuous Mode set to: ");
 	Serial.println("true");
 #elifdef MMC5983MA
-	mmc5983ma.setFilterBandwidth(400);
+	mmc5983ma.setFilterBandwidth(100);
 	Serial.print("Filter Bandwidth set to: ");
 	Serial.println(mmc5983ma.getFilterBandwidth());
 
 	mmc5983ma.setContinuousModeFrequency(100);
 	Serial.print("Continuous Mode Frequency set to: ");
 	Serial.println(mmc5983ma.getContinuousModeFrequency());
+
+	mmc5983ma.setPeriodicSetSamples(1);
+	Serial.print("PeriodicSetSamples set to: ");
+	Serial.println(mmc5983ma.getPeriodicSetSamples());
 
 	mmc5983ma.enableAutomaticSetReset();
 	Serial.print("Automatic Set Reset set to: ");
@@ -244,13 +247,6 @@ void setup() {
 	//	} while (!sixDOF.deviantSpread(x_value, y_value, z_value));
 	// } while (!sixDOF.calOffsets());
 #endif
-	Serial.print("\tXoff: ");
-	Serial.print(sixDOF.xHardOff());
-	Serial.print(" \tYoff: ");
-	Serial.print(sixDOF.yHardOff());
-	Serial.print(" \tZoff: ");
-	Serial.print(sixDOF.zHardOff());
-	Serial.println("");
 }
 
 uint32_t next_heartbeat = 0;
