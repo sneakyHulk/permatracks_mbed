@@ -247,6 +247,8 @@ void setup() {
 	//	} while (!sixDOF.deviantSpread(x_value, y_value, z_value));
 	// } while (!sixDOF.calOffsets());
 #endif
+
+	delay(5000);
 }
 
 uint32_t next_heartbeat = 0;
@@ -284,7 +286,7 @@ void loop() {
 	send_message(x, y, z, "MMC5983MA");
 #elifdef LIS3MDL
 	sensors_event_t event;
-	lis3mdl.getEvent(&event);
+	if (!lis3mdl.getEvent(&event)) return;
 
 	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "LIS3MDL");
 #elifdef MLX90393
