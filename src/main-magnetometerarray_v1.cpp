@@ -3,6 +3,7 @@
 #include <LIS3MDL.h>
 #include <MMC5983MA.h>
 #include <SPI.h>
+#include <common_output.h>
 
 auto SPIrow1 = SPIClass(PB5, PB4, PB3);
 auto SPIrow2 = SPIClass(PB15, PB14, PB13);
@@ -87,78 +88,68 @@ void setup() {
 	lis3mdl15.begin();
 	lis3mdl16.begin();
 
-	mmc5983ma01.begin();
-	mmc5983ma02.begin();
-	mmc5983ma03.begin();
-	mmc5983ma04.begin();
-	mmc5983ma05.begin();
-	mmc5983ma06.begin();
-	mmc5983ma07.begin();
-	mmc5983ma08.begin();
-	mmc5983ma09.begin();
-	mmc5983ma10.begin();
-	mmc5983ma11.begin();
-	mmc5983ma12.begin();
-	mmc5983ma13.begin();
-	mmc5983ma14.begin();
-	mmc5983ma15.begin();
-	mmc5983ma16.begin();
-	mmc5983ma17.begin();
-	mmc5983ma18.begin();
-	mmc5983ma19.begin();
-	mmc5983ma20.begin();
-	mmc5983ma21.begin();
-	mmc5983ma22.begin();
-	mmc5983ma23.begin();
-	mmc5983ma24.begin();
-	mmc5983ma25.begin();
-}
-
-void send_message(float const x, float const y, float const z, const char* sensor_name, uint32_t const timestamp = millis()) {
-	Serial1.printf("[%s, %8.3lf]: ", sensor_name, timestamp / 1000.0);
-	Serial1.print("X=");
-	Serial1.print(x, 5);
-	Serial1.print(", Y=");
-	Serial1.print(y, 5);
-	Serial1.print(", Z=");
-	Serial1.print(z, 5);
-	Serial1.println('.');
+	// mmc5983ma01.begin();
+	// mmc5983ma02.begin();
+	// mmc5983ma03.begin();
+	// mmc5983ma04.begin();
+	// mmc5983ma05.begin();
+	// mmc5983ma06.begin();
+	// mmc5983ma07.begin();
+	// mmc5983ma08.begin();
+	// mmc5983ma09.begin();
+	// mmc5983ma10.begin();
+	// mmc5983ma11.begin();
+	// mmc5983ma12.begin();
+	// mmc5983ma13.begin();
+	// mmc5983ma14.begin();
+	// mmc5983ma15.begin();
+	// mmc5983ma16.begin();
+	// mmc5983ma17.begin();
+	// mmc5983ma18.begin();
+	// mmc5983ma19.begin();
+	// mmc5983ma20.begin();
+	// mmc5983ma21.begin();
+	// mmc5983ma22.begin();
+	// mmc5983ma23.begin();
+	// mmc5983ma24.begin();
+	// mmc5983ma25.begin();
 }
 
 void loop() {
-	lis3mdl01.get_data();
-	lis3mdl02.get_data();
-	lis3mdl03.get_data();
-	lis3mdl04.get_data();
-	lis3mdl05.get_data();
-	lis3mdl06.get_data();
-	lis3mdl07.get_data();
-	lis3mdl08.get_data();
-	lis3mdl09.get_data();
-	lis3mdl10.get_data();
-	lis3mdl11.get_data();
-	lis3mdl12.get_data();
-	lis3mdl13.get_data();
-	lis3mdl14.get_data();
-	lis3mdl15.get_data();
-	lis3mdl16.get_data();
+	lis3mdl01.start_measurement();
+	lis3mdl02.start_measurement();
+	lis3mdl03.start_measurement();
+	lis3mdl04.start_measurement();
+	lis3mdl05.start_measurement();
+	lis3mdl06.start_measurement();
+	lis3mdl07.start_measurement();
+	lis3mdl08.start_measurement();
+	lis3mdl09.start_measurement();
+	lis3mdl10.start_measurement();
+	lis3mdl11.start_measurement();
+	lis3mdl12.start_measurement();
+	lis3mdl13.start_measurement();
+	lis3mdl14.start_measurement();
+	lis3mdl15.start_measurement();
+	lis3mdl16.start_measurement();
 
-	lis3mdl01.output_data();
-	lis3mdl02.output_data();
-	lis3mdl03.output_data();
-	lis3mdl04.output_data();
-	lis3mdl05.output_data();
-	lis3mdl06.output_data();
-	lis3mdl07.output_data();
-	lis3mdl08.output_data();
-	lis3mdl09.output_data();
-	lis3mdl10.output_data();
-	lis3mdl11.output_data();
-	lis3mdl12.output_data();
-	lis3mdl13.output_data();
-	lis3mdl14.output_data();
-	lis3mdl15.output_data();
-	lis3mdl16.output_data();
-
-	delay(100);
+	// clang-format off
+	common::println_time(millis(),
+		'\'', lis3mdl01.sensor_name,  '\'', lis3mdl01.get_measurement(), ", ",
+		'\'', lis3mdl02.sensor_name,  '\'', lis3mdl02.get_measurement(), ", ",
+		'\'', lis3mdl03.sensor_name,  '\'', lis3mdl03.get_measurement(), ", ",
+		'\'', lis3mdl04.sensor_name,  '\'', lis3mdl04.get_measurement(), ", ",
+		'\'', lis3mdl05.sensor_name,  '\'', lis3mdl05.get_measurement(), ", ",
+		'\'', lis3mdl06.sensor_name,  '\'', lis3mdl06.get_measurement(), ", ",
+		'\'', lis3mdl07.sensor_name,  '\'', lis3mdl07.get_measurement(), ", ",
+		'\'', lis3mdl08.sensor_name,  '\'', lis3mdl08.get_measurement(), ", ",
+		'\'', lis3mdl09.sensor_name,  '\'', lis3mdl09.get_measurement(), ", ",
+		'\'', lis3mdl10.sensor_name,  '\'', lis3mdl10.get_measurement(), ", ",
+		'\'', lis3mdl11.sensor_name,  '\'', lis3mdl11.get_measurement(), ", ",
+		'\'', lis3mdl12.sensor_name,  '\'', lis3mdl12.get_measurement(), ", ",
+		'\'', lis3mdl13.sensor_name,  '\'', lis3mdl13.get_measurement(), ", ",
+		'\'', lis3mdl14.sensor_name,  '\'', lis3mdl14.get_measurement(), ", ",
+		'\'', lis3mdl15.sensor_name,  '\'', lis3mdl15.get_measurement(), ", ",
+		'\'', lis3mdl16.sensor_name,  '\'', lis3mdl16.get_measurement(), ";");
+	// clang-format on
 }

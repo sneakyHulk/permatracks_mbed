@@ -1,6 +1,9 @@
 #pragma once
 #include <Adafruit_LIS3MDL.h>
 #include <SPI.h>
+#include <common_printing.h>
+
+#include "common_output.h"
 
 class LIS3MDL final : public Adafruit_LIS3MDL {
 	uint8_t cs_pin;
@@ -15,79 +18,65 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	void begin(lis3mdl_performancemode_t performance_mode = LIS3MDL_ULTRAHIGHMODE, lis3mdl_operationmode_t operation_mode = LIS3MDL_CONTINUOUSMODE, lis3mdl_dataRate_t data_rate = LIS3MDL_DATARATE_80_HZ,
 	    lis3mdl_range_t range = LIS3MDL_RANGE_4_GAUSS) {
 		if (!begin_SPI(cs_pin, spi, 2000000)) {
-			Serial1.printf("[%s, %8.3lf]: ", sensor_name, millis() / 1000.0);
-			Serial1.println("Failed to initialize SPI!");
-
+			common::println_critical_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 
 		setPerformanceMode(performance_mode);
-		Serial1.printf("[%s, %8.3lf]: ", sensor_name, millis() / 1000.0);
-		Serial1.print("Performance mode set to: ");
+		common::print_time(millis(), '\'', sensor_name, '\'', " performance mode set to: ");
 		switch (getPerformanceMode()) {
-			case LIS3MDL_LOWPOWERMODE: Serial1.println("Low"); break;
-			case LIS3MDL_MEDIUMMODE: Serial1.println("Medium"); break;
-			case LIS3MDL_HIGHMODE: Serial1.println("High"); break;
-			case LIS3MDL_ULTRAHIGHMODE: Serial1.println("Ultra-High"); break;
+			case LIS3MDL_LOWPOWERMODE: common::println("Low"); break;
+			case LIS3MDL_MEDIUMMODE: common::println("Medium"); break;
+			case LIS3MDL_HIGHMODE: common::println("High"); break;
+			case LIS3MDL_ULTRAHIGHMODE: common::println("Ultra-High"); break;
 		}
 
 		setOperationMode(operation_mode);
-		Serial1.printf("[%s, %8.3lf]: ", sensor_name, millis() / 1000.0);
-		Serial1.print("Operation mode set to: ");
+		common::print_time(millis(), '\'', sensor_name, '\'', " operation mode set to: ");
 		// Single shot mode will complete conversion and go into power down
 		switch (getOperationMode()) {
-			case LIS3MDL_CONTINUOUSMODE: Serial1.println("Continuous"); break;
-			case LIS3MDL_SINGLEMODE: Serial1.println("Single mode"); break;
-			case LIS3MDL_POWERDOWNMODE: Serial1.println("Power-down"); break;
+			case LIS3MDL_CONTINUOUSMODE: common::println("Continuous"); break;
+			case LIS3MDL_SINGLEMODE: common::println("Single mode"); break;
+			case LIS3MDL_POWERDOWNMODE: common::println("Power-down"); break;
 		}
 
 		setDataRate(data_rate);
 		// You can check the datarate by looking at the frequency of the DRDY pin
-		Serial1.printf("[%s, %8.3lf]: ", sensor_name, millis() / 1000.0);
-		Serial1.print("Data rate set to: ");
+		common::print_time(millis(), '\'', sensor_name, '\'', " data rate set to: ");
+
 		switch (getDataRate()) {
-			case LIS3MDL_DATARATE_0_625_HZ: Serial1.println("0.625 Hz"); break;
-			case LIS3MDL_DATARATE_1_25_HZ: Serial1.println("1.25 Hz"); break;
-			case LIS3MDL_DATARATE_2_5_HZ: Serial1.println("2.5 Hz"); break;
-			case LIS3MDL_DATARATE_5_HZ: Serial1.println("5 Hz"); break;
-			case LIS3MDL_DATARATE_10_HZ: Serial1.println("10 Hz"); break;
-			case LIS3MDL_DATARATE_20_HZ: Serial1.println("20 Hz"); break;
-			case LIS3MDL_DATARATE_40_HZ: Serial1.println("40 Hz"); break;
-			case LIS3MDL_DATARATE_80_HZ: Serial1.println("80 Hz"); break;
-			case LIS3MDL_DATARATE_155_HZ: Serial1.println("155 Hz"); break;
-			case LIS3MDL_DATARATE_300_HZ: Serial1.println("300 Hz"); break;
-			case LIS3MDL_DATARATE_560_HZ: Serial1.println("560 Hz"); break;
-			case LIS3MDL_DATARATE_1000_HZ: Serial1.println("1000 Hz"); break;
+			case LIS3MDL_DATARATE_0_625_HZ: common::println("0.625 Hz"); break;
+			case LIS3MDL_DATARATE_1_25_HZ: common::println("1.25 Hz"); break;
+			case LIS3MDL_DATARATE_2_5_HZ: common::println("2.5 Hz"); break;
+			case LIS3MDL_DATARATE_5_HZ: common::println("5 Hz"); break;
+			case LIS3MDL_DATARATE_10_HZ: common::println("10 Hz"); break;
+			case LIS3MDL_DATARATE_20_HZ: common::println("20 Hz"); break;
+			case LIS3MDL_DATARATE_40_HZ: common::println("40 Hz"); break;
+			case LIS3MDL_DATARATE_80_HZ: common::println("80 Hz"); break;
+			case LIS3MDL_DATARATE_155_HZ: common::println("155 Hz"); break;
+			case LIS3MDL_DATARATE_300_HZ: common::println("300 Hz"); break;
+			case LIS3MDL_DATARATE_560_HZ: common::println("560 Hz"); break;
+			case LIS3MDL_DATARATE_1000_HZ: common::println("1000 Hz"); break;
 		}
 
 		setRange(range);
-		Serial1.printf("[%s, %8.3lf]: ", sensor_name, millis() / 1000.0);
-		Serial1.print("Range set to: ");
+		common::print_time(millis(), '\'', sensor_name, '\'', " range set to: ");
 		switch (getRange()) {
-			case LIS3MDL_RANGE_4_GAUSS: Serial1.println("+-4 gauss"); break;
-			case LIS3MDL_RANGE_8_GAUSS: Serial1.println("+-8 gauss"); break;
-			case LIS3MDL_RANGE_12_GAUSS: Serial1.println("+-12 gauss"); break;
-			case LIS3MDL_RANGE_16_GAUSS: Serial1.println("+-16 gauss"); break;
+			case LIS3MDL_RANGE_4_GAUSS: common::println("+-4 gauss"); break;
+			case LIS3MDL_RANGE_8_GAUSS: common::println("+-8 gauss"); break;
+			case LIS3MDL_RANGE_12_GAUSS: common::println("+-12 gauss"); break;
+			case LIS3MDL_RANGE_16_GAUSS: common::println("+-16 gauss"); break;
 		}
 	}
 
-	void get_data() {
+	void start_measurement() {
 		if (!getEvent(&event)) {
-			Serial1.printf("[%s, %8.3lf]: ", sensor_name, event.timestamp / 1000.0);
-			Serial1.println("Failed to get data!");
+			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 		}
 	}
 
-	void output_data() const {
-		Serial1.printf("[%s, %8.3lf]: ", sensor_name, event.timestamp / 1000.0);
-		Serial1.print("X=");
-		Serial1.print(event.magnetic.x, 5);
-		Serial1.print(", Y=");
-		Serial1.print(event.magnetic.y, 5);
-		Serial1.print(", Z=");
-		Serial1.print(event.magnetic.z, 5);
-		Serial1.println('.');
-	}
+	// switch x and y because of datasheet
+	[[nodiscard]] std::tuple<decltype(millis()), float, float, float> get_measurement() const { return std::make_tuple(event.timestamp, event.magnetic.y, event.magnetic.x, event.magnetic.z); }
 
    private:
 	using Adafruit_LIS3MDL::begin_I2C;
