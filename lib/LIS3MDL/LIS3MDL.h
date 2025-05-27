@@ -76,7 +76,7 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	}
 
 	// switch x and y because of datasheet
-	[[nodiscard]] std::tuple<decltype(millis()), float, float, float> get_measurement() const { return std::make_tuple(event.timestamp, event.magnetic.y, event.magnetic.x, event.magnetic.z); }
+	[[nodiscard]] std::tuple<decltype(millis()), float, float, float> get_measurement() const { return std::make_tuple(event.timestamp, event.magnetic.y, -event.magnetic.x, event.magnetic.z); }
 
    private:
 	using Adafruit_LIS3MDL::begin_I2C;
