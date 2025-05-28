@@ -55,7 +55,7 @@ MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 HardwareSerial Serial1(PB7, PB6);
 
 void setup() {
-	Serial1.begin(115200);
+	Serial1.begin(921600);
 	delay(2000);
 
 	// obligatory Hello World
@@ -88,34 +88,60 @@ void setup() {
 	lis3mdl15.begin();
 	lis3mdl16.begin();
 
-	// mmc5983ma01.begin();
-	// mmc5983ma02.begin();
-	// mmc5983ma03.begin();
-	// mmc5983ma04.begin();
-	// mmc5983ma05.begin();
-	// mmc5983ma06.begin();
-	// mmc5983ma07.begin();
-	// mmc5983ma08.begin();
-	// mmc5983ma09.begin();
-	// mmc5983ma10.begin();
-	// mmc5983ma11.begin();
-	// mmc5983ma12.begin();
-	// mmc5983ma13.begin();
-	// mmc5983ma14.begin();
-	// mmc5983ma15.begin();
-	// mmc5983ma16.begin();
-	// mmc5983ma17.begin();
-	// mmc5983ma18.begin();
-	// mmc5983ma19.begin();
-	// mmc5983ma20.begin();
-	// mmc5983ma21.begin();
-	// mmc5983ma22.begin();
-	// mmc5983ma23.begin();
-	// mmc5983ma24.begin();
-	// mmc5983ma25.begin();
+	mmc5983ma01.begin();
+	mmc5983ma02.begin();
+	mmc5983ma03.begin();
+	mmc5983ma04.begin();
+	mmc5983ma05.begin();
+	mmc5983ma06.begin();
+	mmc5983ma07.begin();
+	mmc5983ma08.begin();
+	mmc5983ma09.begin();
+	mmc5983ma10.begin();
+	mmc5983ma11.begin();
+	mmc5983ma12.begin();
+	mmc5983ma13.begin();
+	mmc5983ma14.begin();
+	mmc5983ma15.begin();
+	mmc5983ma16.begin();
+	mmc5983ma17.begin();
+	mmc5983ma18.begin();
+	mmc5983ma19.begin();
+	mmc5983ma20.begin();
+	mmc5983ma21.begin();
+	mmc5983ma22.begin();
+	mmc5983ma23.begin();
+	mmc5983ma24.begin();
+	mmc5983ma25.begin();
 }
 
 void loop() {
+	mmc5983ma01.start_measurement();
+	mmc5983ma02.start_measurement();
+	mmc5983ma03.start_measurement();
+	mmc5983ma04.start_measurement();
+	mmc5983ma05.start_measurement();
+	mmc5983ma06.start_measurement();
+	mmc5983ma07.start_measurement();
+	mmc5983ma08.start_measurement();
+	mmc5983ma09.start_measurement();
+	mmc5983ma10.start_measurement();
+	mmc5983ma11.start_measurement();
+	mmc5983ma12.start_measurement();
+	mmc5983ma13.start_measurement();
+	mmc5983ma14.start_measurement();
+	mmc5983ma15.start_measurement();
+	mmc5983ma16.start_measurement();
+	mmc5983ma17.start_measurement();
+	mmc5983ma18.start_measurement();
+	mmc5983ma19.start_measurement();
+	mmc5983ma20.start_measurement();
+	mmc5983ma21.start_measurement();
+	mmc5983ma22.start_measurement();
+	mmc5983ma23.start_measurement();
+	mmc5983ma24.start_measurement();
+	mmc5983ma25.start_measurement();
+
 	lis3mdl01.start_measurement();
 	lis3mdl02.start_measurement();
 	lis3mdl03.start_measurement();
@@ -135,21 +161,46 @@ void loop() {
 
 	// clang-format off
 	common::println_time(millis(),
-		'\'', lis3mdl01.sensor_name,  '\'', lis3mdl01.get_measurement(), ", ",
-		'\'', lis3mdl02.sensor_name,  '\'', lis3mdl02.get_measurement(), ", ",
-		'\'', lis3mdl03.sensor_name,  '\'', lis3mdl03.get_measurement(), ", ",
-		'\'', lis3mdl04.sensor_name,  '\'', lis3mdl04.get_measurement(), ", ",
-		'\'', lis3mdl05.sensor_name,  '\'', lis3mdl05.get_measurement(), ", ",
-		'\'', lis3mdl06.sensor_name,  '\'', lis3mdl06.get_measurement(), ", ",
-		'\'', lis3mdl07.sensor_name,  '\'', lis3mdl07.get_measurement(), ", ",
-		'\'', lis3mdl08.sensor_name,  '\'', lis3mdl08.get_measurement(), ", ",
-		'\'', lis3mdl09.sensor_name,  '\'', lis3mdl09.get_measurement(), ", ",
-		'\'', lis3mdl10.sensor_name,  '\'', lis3mdl10.get_measurement(), ", ",
-		'\'', lis3mdl11.sensor_name,  '\'', lis3mdl11.get_measurement(), ", ",
-		'\'', lis3mdl12.sensor_name,  '\'', lis3mdl12.get_measurement(), ", ",
-		'\'', lis3mdl13.sensor_name,  '\'', lis3mdl13.get_measurement(), ", ",
-		'\'', lis3mdl14.sensor_name,  '\'', lis3mdl14.get_measurement(), ", ",
-		'\'', lis3mdl15.sensor_name,  '\'', lis3mdl15.get_measurement(), ", ",
+		'\'', mmc5983ma01.sensor_name,  '\'', mmc5983ma01.get_measurement(), ",",
+		'\'', mmc5983ma02.sensor_name,  '\'', mmc5983ma02.get_measurement(), ",",
+		'\'', mmc5983ma03.sensor_name,  '\'', mmc5983ma03.get_measurement(), ",",
+		'\'', mmc5983ma04.sensor_name,  '\'', mmc5983ma04.get_measurement(), ",",
+		'\'', mmc5983ma05.sensor_name,  '\'', mmc5983ma05.get_measurement(), ",",
+		'\'', mmc5983ma06.sensor_name,  '\'', mmc5983ma06.get_measurement(), ",",
+		'\'', mmc5983ma07.sensor_name,  '\'', mmc5983ma07.get_measurement(), ",",
+		'\'', mmc5983ma08.sensor_name,  '\'', mmc5983ma08.get_measurement(), ",",
+		'\'', mmc5983ma09.sensor_name,  '\'', mmc5983ma09.get_measurement(), ",",
+		'\'', mmc5983ma10.sensor_name,  '\'', mmc5983ma10.get_measurement(), ",",
+		'\'', mmc5983ma11.sensor_name,  '\'', mmc5983ma11.get_measurement(), ",",
+		'\'', mmc5983ma12.sensor_name,  '\'', mmc5983ma12.get_measurement(), ",",
+		'\'', mmc5983ma13.sensor_name,  '\'', mmc5983ma13.get_measurement(), ",",
+		'\'', mmc5983ma14.sensor_name,  '\'', mmc5983ma14.get_measurement(), ",",
+		'\'', mmc5983ma15.sensor_name,  '\'', mmc5983ma15.get_measurement(), ",",
+		'\'', mmc5983ma16.sensor_name,  '\'', mmc5983ma16.get_measurement(), ",",
+		'\'', mmc5983ma17.sensor_name,  '\'', mmc5983ma17.get_measurement(), ",",
+		'\'', mmc5983ma18.sensor_name,  '\'', mmc5983ma18.get_measurement(), ",",
+		'\'', mmc5983ma19.sensor_name,  '\'', mmc5983ma19.get_measurement(), ",",
+		'\'', mmc5983ma20.sensor_name,  '\'', mmc5983ma20.get_measurement(), ",",
+		'\'', mmc5983ma21.sensor_name,  '\'', mmc5983ma21.get_measurement(), ",",
+		'\'', mmc5983ma22.sensor_name,  '\'', mmc5983ma22.get_measurement(), ",",
+		'\'', mmc5983ma23.sensor_name,  '\'', mmc5983ma23.get_measurement(), ",",
+		'\'', mmc5983ma24.sensor_name,  '\'', mmc5983ma24.get_measurement(), ",",
+		'\'', mmc5983ma25.sensor_name,  '\'', mmc5983ma25.get_measurement(), ",",
+		'\'', lis3mdl01.sensor_name,  '\'', lis3mdl01.get_measurement(), ",",
+		'\'', lis3mdl02.sensor_name,  '\'', lis3mdl02.get_measurement(), ",",
+		'\'', lis3mdl03.sensor_name,  '\'', lis3mdl03.get_measurement(), ",",
+		'\'', lis3mdl04.sensor_name,  '\'', lis3mdl04.get_measurement(), ",",
+		'\'', lis3mdl05.sensor_name,  '\'', lis3mdl05.get_measurement(), ",",
+		'\'', lis3mdl06.sensor_name,  '\'', lis3mdl06.get_measurement(), ",",
+		'\'', lis3mdl07.sensor_name,  '\'', lis3mdl07.get_measurement(), ",",
+		'\'', lis3mdl08.sensor_name,  '\'', lis3mdl08.get_measurement(), ",",
+		'\'', lis3mdl09.sensor_name,  '\'', lis3mdl09.get_measurement(), ",",
+		'\'', lis3mdl10.sensor_name,  '\'', lis3mdl10.get_measurement(), ",",
+		'\'', lis3mdl11.sensor_name,  '\'', lis3mdl11.get_measurement(), ",",
+		'\'', lis3mdl12.sensor_name,  '\'', lis3mdl12.get_measurement(), ",",
+		'\'', lis3mdl13.sensor_name,  '\'', lis3mdl13.get_measurement(), ",",
+		'\'', lis3mdl14.sensor_name,  '\'', lis3mdl14.get_measurement(), ",",
+		'\'', lis3mdl15.sensor_name,  '\'', lis3mdl15.get_measurement(), ",",
 		'\'', lis3mdl16.sensor_name,  '\'', lis3mdl16.get_measurement(), ";");
 	// clang-format on
 }

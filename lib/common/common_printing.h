@@ -24,7 +24,7 @@ namespace common {
 #endif
 			print_low_level(space);
 			print_low_level(e);
-			*space = ',', *(space + 1) = ' ';
+			*space = ',';  //,*(space + 1) = ' '; // dont need spaces
 		}
 
 		print_low_level(')');
@@ -40,7 +40,8 @@ namespace common {
 		static auto print_tuple = []<std::size_t... I>(std::tuple<T...> const& tup, std::index_sequence<I...>) {
 			char space[]{0, 0, 0};
 
-			((print_low_level(space), print_low_level(std::get<I>(tup)), *space = ',', *(space + 1) = ' '), ...);
+			// dont need spaces
+			((print_low_level(space), print_low_level(std::get<I>(tup)), *space = ',' /*, *(space + 1) = ' '*/), ...);
 		};
 
 		print_low_level('(');

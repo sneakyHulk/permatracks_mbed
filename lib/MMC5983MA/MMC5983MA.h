@@ -17,43 +17,38 @@ class MMC5983MA final : public SFE_MMC5983MA {
 	explicit MMC5983MA(const char* sensor_name, uint8_t cs_pin, SPIClass* spi) : sensor_name(sensor_name), cs_pin(cs_pin), spi(spi) {}
 
 	void begin(uint16_t filter_bandwidth = 100, uint16_t continuous_mode_frequency = 100, uint16_t periodic_set_samples = 1, bool enable_automatic_set_reset = true, bool enable_continuous_mode = true) {
-		if (!SFE_MMC5983MA::begin(cs_pin, *spi)) {
-			Serial1.printf("[%s, %010d]: ", sensor_name, millis());
-			Serial1.println("Failed to initialize SPI!");
+		if (!SFE_MMC5983MA::begin(cs_pin, SPISettings(10000000, MSBFIRST, SPI_MODE0), *spi)) { // 10MHz max
+			common::println_critical_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 
 		setFilterBandwidth(filter_bandwidth);
-		Serial1.printf("[%s, %010d]: ", sensor_name, millis());
-		Serial1.print("Filter Bandwidth set to: ");
-		Serial1.println(getFilterBandwidth());
+		common::print_time(millis(), '\'', sensor_name, '\'', " filter bandwidth set to: ");
+		common::println(getFilterBandwidth());
 
 		setContinuousModeFrequency(continuous_mode_frequency);
-		Serial1.printf("[%s, %010d]: ", sensor_name, millis());
-		Serial1.print("Continuous Mode Frequency set to: ");
-		Serial1.println(getContinuousModeFrequency());
+		common::print_time(millis(), '\'', sensor_name, '\'', " continuous mode frequency set to: ");
+		common::println(getContinuousModeFrequency());
 
 		setPeriodicSetSamples(periodic_set_samples);
-		Serial1.printf("[%s, %010d]: ", sensor_name, millis());
-		Serial1.print("PeriodicSetSamples set to: ");
-		Serial1.println(getPeriodicSetSamples());
+		common::print_time(millis(), '\'', sensor_name, '\'', " periodic set samples set to: ");
+		common::println(getPeriodicSetSamples());
 
 		if (enable_automatic_set_reset) {
 			enableAutomaticSetReset();
 		} else {
 			disableAutomaticSetReset();
 		}
-		Serial1.printf("[%s, %010d]: ", sensor_name, millis());
-		Serial1.print("Automatic Set Reset set to: ");
-		Serial1.println(isAutomaticSetResetEnabled() ? "enabled" : "disabled");
+		common::print_time(millis(), '\'', sensor_name, '\'', " automatic set/reset set to: ");
+		common::println(isAutomaticSetResetEnabled() ? "enabled" : "disabled");
 
 		if (enable_continuous_mode) {
 			enableContinuousMode();
 		} else {
 			disableContinuousMode();
 		}
-		Serial1.print("Continuous Mode set to: ");
-		Serial1.println(isContinuousModeEnabled() ? "enabled" : "disabled");
+		common::print_time(millis(), '\'', sensor_name, '\'', " continuous mode set to: ");
+		common::println(isContinuousModeEnabled() ? "enabled" : "disabled");
 	}
 
 	void start_measurement() {
@@ -75,6 +70,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			// Wait a little so we won't flood MMC with requests
 			delay(1);
 			timeOut--;
+			common::println_warn_time_loc(millis(), "too slow");
 		}
 
 		clearShadowBit(INT_CTRL_0_REG, TM_M, false);  // Clear the bit - in shadow memory only
