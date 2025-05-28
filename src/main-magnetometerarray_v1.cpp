@@ -55,7 +55,7 @@ MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 HardwareSerial Serial1(PB7, PB6);
 
 void setup() {
-	Serial1.begin(921600);
+	Serial1.begin(230400);
 	delay(2000);
 
 	// obligatory Hello World
