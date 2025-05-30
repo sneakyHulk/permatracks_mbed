@@ -1,9 +1,11 @@
 #pragma once
-#include <Adafruit_LIS3MDL.h>
-#include <SPI.h>
-#include <common_printing.h>
 
-#include "common_output.h"
+#include <SPI.h>
+#include <common.h>
+#include <common_output.h>
+
+#define private protected
+#include <Adafruit_LIS3MDL.h>
 
 class LIS3MDL final : public Adafruit_LIS3MDL {
 	uint8_t cs_pin;
@@ -69,15 +71,41 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 		}
 	}
 
-	void start_measurement() {
+	void start_measurement_float() {
 		if (!getEvent(&event)) {
 			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 		}
 	}
 
-	// switch x and y because of datasheet
-	[[nodiscard]] std::tuple<decltype(millis()), float, float, float> get_measurement() const { return std::make_tuple(event.timestamp, event.magnetic.y, -event.magnetic.x, event.magnetic.z); }
+	void start_measurement() {
+		uint8_t buffer[6];
 
+		Adafruit_BusIO_Register XYZDataReg = Adafruit_BusIO_Register(i2c_dev, spi_dev, AD8_HIGH_TOREAD_AD7_HIGH_TOINC, LIS3MDL_REG_OUT_X_L, 6);
+		XYZDataReg.read(buffer, 6);
+		x = buffer[0];
+		x |= buffer[1] << 8;
+		y = buffer[2];
+		y |= buffer[3] << 8;
+		z = buffer[4];
+		z |= buffer[5] << 8;
+	}
+
+	struct MagneticFluxDensityDataRaw {
+		union {
+			struct {
+				int16_t x;
+				int16_t y;
+				int16_t z;
+			};
+			uint8_t bytes[6];
+		};
+	};
+	// switch x and y because of datasheet
+	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const { return {y, static_cast<int16_t>(-x), z}; }
+
+	[[nodiscard]] common::MagneticFluxDensityData get_measurement_float() const { return {event.magnetic.y, -event.magnetic.x, event.magnetic.z}; }
+
+#undef private
    private:
 	using Adafruit_LIS3MDL::begin_I2C;
 	using Adafruit_LIS3MDL::begin_SPI;
