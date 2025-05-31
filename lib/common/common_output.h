@@ -171,7 +171,7 @@ namespace common {
 
 	template <printable... Args>
 	struct println_critical_time_loc {
-		explicit println_critical_time_loc(std::integral auto timestamp, Args&&... args, std::source_location const location = std::source_location::current()) {
+		[[noreturn]] explicit println_critical_time_loc(std::integral auto timestamp, Args&&... args, std::source_location const location = std::source_location::current()) {
 			print(RED);
 
 			while (true) {

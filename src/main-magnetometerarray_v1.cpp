@@ -119,6 +119,7 @@ void setup() {
 
 void loop() {
 	static CRC16 crc(0x8005, 0, false, true, true);
+
 	crc.restart();
 	static unsigned long last = 0;
 
@@ -174,54 +175,62 @@ void loop() {
 	lis3mdl15.start_measurement();
 	lis3mdl16.start_measurement();
 
-	constexpr std::array<uint8_t, 2> header = {0xAA, 0x55};
+	constexpr std::array<uint8_t, 2> const header = {0xAA, 0x55};
 	Serial1.write(header.data(), 2);
 
-	// clang-format off
-	auto mag_data26 = lis3mdl01.get_measurement_float(); Serial1.write(mag_data26.bytes, 12); crc.add(mag_data26.bytes, 12);
-	auto mag_data27 = lis3mdl02.get_measurement_float(); Serial1.write(mag_data27.bytes, 12); crc.add(mag_data27.bytes, 12);
-	auto mag_data28 = lis3mdl03.get_measurement_float(); Serial1.write(mag_data28.bytes, 12); crc.add(mag_data28.bytes, 12);
-	auto mag_data29 = lis3mdl04.get_measurement_float(); Serial1.write(mag_data29.bytes, 12); crc.add(mag_data29.bytes, 12);
-	auto mag_data30 = lis3mdl05.get_measurement_float(); Serial1.write(mag_data30.bytes, 12); crc.add(mag_data30.bytes, 12);
-	auto mag_data31 = lis3mdl06.get_measurement_float(); Serial1.write(mag_data31.bytes, 12); crc.add(mag_data31.bytes, 12);
-	auto mag_data32 = lis3mdl07.get_measurement_float(); Serial1.write(mag_data32.bytes, 12); crc.add(mag_data32.bytes, 12);
-	auto mag_data33 = lis3mdl08.get_measurement_float(); Serial1.write(mag_data33.bytes, 12); crc.add(mag_data33.bytes, 12);
-	auto mag_data34 = lis3mdl09.get_measurement_float(); Serial1.write(mag_data34.bytes, 12); crc.add(mag_data34.bytes, 12);
-	auto mag_data35 = lis3mdl10.get_measurement_float(); Serial1.write(mag_data35.bytes, 12); crc.add(mag_data35.bytes, 12);
-	auto mag_data36 = lis3mdl11.get_measurement_float(); Serial1.write(mag_data36.bytes, 12); crc.add(mag_data36.bytes, 12);
-	auto mag_data37 = lis3mdl12.get_measurement_float(); Serial1.write(mag_data37.bytes, 12); crc.add(mag_data37.bytes, 12);
-	auto mag_data38 = lis3mdl13.get_measurement_float(); Serial1.write(mag_data38.bytes, 12); crc.add(mag_data38.bytes, 12);
-	auto mag_data39 = lis3mdl14.get_measurement_float(); Serial1.write(mag_data39.bytes, 12); crc.add(mag_data39.bytes, 12);
-	auto mag_data40 = lis3mdl15.get_measurement_float(); Serial1.write(mag_data40.bytes, 12); crc.add(mag_data40.bytes, 12);
-	auto mag_data41 = lis3mdl16.get_measurement_float(); Serial1.write(mag_data41.bytes, 12); crc.add(mag_data41.bytes, 12);
-	// clang-format on
+	auto const scale_lis3mdl = std::bit_cast<std::array<std::uint8_t, sizeof(lis3mdl01.get_scale_factor())>>(lis3mdl01.get_scale_factor());
+	Serial1.write(scale_lis3mdl.data(), scale_lis3mdl.size());
+	crc.add(scale_lis3mdl.data(), scale_lis3mdl.size());
 
 	// clang-format off
-	auto mag_data01 = mmc5983ma01.get_measurement_float(); Serial1.write(mag_data01.bytes, 12); crc.add(mag_data01.bytes, 12);
-	auto mag_data02 = mmc5983ma02.get_measurement_float(); Serial1.write(mag_data02.bytes, 12); crc.add(mag_data02.bytes, 12);
-	auto mag_data03 = mmc5983ma03.get_measurement_float(); Serial1.write(mag_data03.bytes, 12); crc.add(mag_data03.bytes, 12);
-	auto mag_data04 = mmc5983ma04.get_measurement_float(); Serial1.write(mag_data04.bytes, 12); crc.add(mag_data04.bytes, 12);
-	auto mag_data05 = mmc5983ma05.get_measurement_float(); Serial1.write(mag_data05.bytes, 12); crc.add(mag_data05.bytes, 12);
-	auto mag_data06 = mmc5983ma06.get_measurement_float(); Serial1.write(mag_data06.bytes, 12); crc.add(mag_data06.bytes, 12);
-	auto mag_data07 = mmc5983ma07.get_measurement_float(); Serial1.write(mag_data07.bytes, 12); crc.add(mag_data07.bytes, 12);
-	auto mag_data08 = mmc5983ma08.get_measurement_float(); Serial1.write(mag_data08.bytes, 12); crc.add(mag_data08.bytes, 12);
-	auto mag_data09 = mmc5983ma09.get_measurement_float(); Serial1.write(mag_data09.bytes, 12); crc.add(mag_data09.bytes, 12);
-	auto mag_data10 = mmc5983ma10.get_measurement_float(); Serial1.write(mag_data10.bytes, 12); crc.add(mag_data10.bytes, 12);
-	auto mag_data11 = mmc5983ma11.get_measurement_float(); Serial1.write(mag_data11.bytes, 12); crc.add(mag_data11.bytes, 12);
-	auto mag_data12 = mmc5983ma12.get_measurement_float(); Serial1.write(mag_data12.bytes, 12); crc.add(mag_data12.bytes, 12);
-	auto mag_data13 = mmc5983ma13.get_measurement_float(); Serial1.write(mag_data13.bytes, 12); crc.add(mag_data13.bytes, 12);
-	auto mag_data14 = mmc5983ma14.get_measurement_float(); Serial1.write(mag_data14.bytes, 12); crc.add(mag_data14.bytes, 12);
-	auto mag_data15 = mmc5983ma15.get_measurement_float(); Serial1.write(mag_data15.bytes, 12); crc.add(mag_data15.bytes, 12);
-	auto mag_data16 = mmc5983ma16.get_measurement_float(); Serial1.write(mag_data16.bytes, 12); crc.add(mag_data16.bytes, 12);
-	auto mag_data17 = mmc5983ma17.get_measurement_float(); Serial1.write(mag_data17.bytes, 12); crc.add(mag_data17.bytes, 12);
-	auto mag_data18 = mmc5983ma18.get_measurement_float(); Serial1.write(mag_data18.bytes, 12); crc.add(mag_data18.bytes, 12);
-	auto mag_data19 = mmc5983ma19.get_measurement_float(); Serial1.write(mag_data19.bytes, 12); crc.add(mag_data19.bytes, 12);
-	auto mag_data20 = mmc5983ma20.get_measurement_float(); Serial1.write(mag_data20.bytes, 12); crc.add(mag_data20.bytes, 12);
-	auto mag_data21 = mmc5983ma21.get_measurement_float(); Serial1.write(mag_data21.bytes, 12); crc.add(mag_data21.bytes, 12);
-	auto mag_data22 = mmc5983ma22.get_measurement_float(); Serial1.write(mag_data22.bytes, 12); crc.add(mag_data22.bytes, 12);
-	auto mag_data23 = mmc5983ma23.get_measurement_float(); Serial1.write(mag_data23.bytes, 12); crc.add(mag_data23.bytes, 12);
-	auto mag_data24 = mmc5983ma24.get_measurement_float(); Serial1.write(mag_data24.bytes, 12); crc.add(mag_data24.bytes, 12);
-	auto mag_data25 = mmc5983ma25.get_measurement_float(); Serial1.write(mag_data25.bytes, 12); crc.add(mag_data25.bytes, 12);
+	auto mag_data26 = lis3mdl01.get_measurement(); Serial1.write(mag_data26.bytes, 6); crc.add(mag_data26.bytes, 6);
+	auto mag_data27 = lis3mdl02.get_measurement(); Serial1.write(mag_data27.bytes, 6); crc.add(mag_data27.bytes, 6);
+	auto mag_data28 = lis3mdl03.get_measurement(); Serial1.write(mag_data28.bytes, 6); crc.add(mag_data28.bytes, 6);
+	auto mag_data29 = lis3mdl04.get_measurement(); Serial1.write(mag_data29.bytes, 6); crc.add(mag_data29.bytes, 6);
+	auto mag_data30 = lis3mdl05.get_measurement(); Serial1.write(mag_data30.bytes, 6); crc.add(mag_data30.bytes, 6);
+	auto mag_data31 = lis3mdl06.get_measurement(); Serial1.write(mag_data31.bytes, 6); crc.add(mag_data31.bytes, 6);
+	auto mag_data32 = lis3mdl07.get_measurement(); Serial1.write(mag_data32.bytes, 6); crc.add(mag_data32.bytes, 6);
+	auto mag_data33 = lis3mdl08.get_measurement(); Serial1.write(mag_data33.bytes, 6); crc.add(mag_data33.bytes, 6);
+	auto mag_data34 = lis3mdl09.get_measurement(); Serial1.write(mag_data34.bytes, 6); crc.add(mag_data34.bytes, 6);
+	auto mag_data35 = lis3mdl10.get_measurement(); Serial1.write(mag_data35.bytes, 6); crc.add(mag_data35.bytes, 6);
+	auto mag_data36 = lis3mdl11.get_measurement(); Serial1.write(mag_data36.bytes, 6); crc.add(mag_data36.bytes, 6);
+	auto mag_data37 = lis3mdl12.get_measurement(); Serial1.write(mag_data37.bytes, 6); crc.add(mag_data37.bytes, 6);
+	auto mag_data38 = lis3mdl13.get_measurement(); Serial1.write(mag_data38.bytes, 6); crc.add(mag_data38.bytes, 6);
+	auto mag_data39 = lis3mdl14.get_measurement(); Serial1.write(mag_data39.bytes, 6); crc.add(mag_data39.bytes, 6);
+	auto mag_data40 = lis3mdl15.get_measurement(); Serial1.write(mag_data40.bytes, 6); crc.add(mag_data40.bytes, 6);
+	auto mag_data41 = lis3mdl16.get_measurement(); Serial1.write(mag_data41.bytes, 6); crc.add(mag_data41.bytes, 6);
+	// clang-format on
+
+	auto const scale_mmc5983ma = std::bit_cast<std::array<std::uint8_t, sizeof(mmc5983ma01.get_scale_factor())>>(mmc5983ma01.get_scale_factor());
+	Serial1.write(scale_mmc5983ma.data(), scale_mmc5983ma.size());
+	crc.add(scale_mmc5983ma.data(), scale_mmc5983ma.size());
+
+	// clang-format off
+	auto mag_data01 = mmc5983ma01.get_measurement(); Serial1.write(mag_data01.bytes, 7); crc.add(mag_data01.bytes, 7);
+	auto mag_data02 = mmc5983ma02.get_measurement(); Serial1.write(mag_data02.bytes, 7); crc.add(mag_data02.bytes, 7);
+	auto mag_data03 = mmc5983ma03.get_measurement(); Serial1.write(mag_data03.bytes, 7); crc.add(mag_data03.bytes, 7);
+	auto mag_data04 = mmc5983ma04.get_measurement(); Serial1.write(mag_data04.bytes, 7); crc.add(mag_data04.bytes, 7);
+	auto mag_data05 = mmc5983ma05.get_measurement(); Serial1.write(mag_data05.bytes, 7); crc.add(mag_data05.bytes, 7);
+	auto mag_data06 = mmc5983ma06.get_measurement(); Serial1.write(mag_data06.bytes, 7); crc.add(mag_data06.bytes, 7);
+	auto mag_data07 = mmc5983ma07.get_measurement(); Serial1.write(mag_data07.bytes, 7); crc.add(mag_data07.bytes, 7);
+	auto mag_data08 = mmc5983ma08.get_measurement(); Serial1.write(mag_data08.bytes, 7); crc.add(mag_data08.bytes, 7);
+	auto mag_data09 = mmc5983ma09.get_measurement(); Serial1.write(mag_data09.bytes, 7); crc.add(mag_data09.bytes, 7);
+	auto mag_data10 = mmc5983ma10.get_measurement(); Serial1.write(mag_data10.bytes, 7); crc.add(mag_data10.bytes, 7);
+	auto mag_data11 = mmc5983ma11.get_measurement(); Serial1.write(mag_data11.bytes, 7); crc.add(mag_data11.bytes, 7);
+	auto mag_data12 = mmc5983ma12.get_measurement(); Serial1.write(mag_data12.bytes, 7); crc.add(mag_data12.bytes, 7);
+	auto mag_data13 = mmc5983ma13.get_measurement(); Serial1.write(mag_data13.bytes, 7); crc.add(mag_data13.bytes, 7);
+	auto mag_data14 = mmc5983ma14.get_measurement(); Serial1.write(mag_data14.bytes, 7); crc.add(mag_data14.bytes, 7);
+	auto mag_data15 = mmc5983ma15.get_measurement(); Serial1.write(mag_data15.bytes, 7); crc.add(mag_data15.bytes, 7);
+	auto mag_data16 = mmc5983ma16.get_measurement(); Serial1.write(mag_data16.bytes, 7); crc.add(mag_data16.bytes, 7);
+	auto mag_data17 = mmc5983ma17.get_measurement(); Serial1.write(mag_data17.bytes, 7); crc.add(mag_data17.bytes, 7);
+	auto mag_data18 = mmc5983ma18.get_measurement(); Serial1.write(mag_data18.bytes, 7); crc.add(mag_data18.bytes, 7);
+	auto mag_data19 = mmc5983ma19.get_measurement(); Serial1.write(mag_data19.bytes, 7); crc.add(mag_data19.bytes, 7);
+	auto mag_data20 = mmc5983ma20.get_measurement(); Serial1.write(mag_data20.bytes, 7); crc.add(mag_data20.bytes, 7);
+	auto mag_data21 = mmc5983ma21.get_measurement(); Serial1.write(mag_data21.bytes, 7); crc.add(mag_data21.bytes, 7);
+	auto mag_data22 = mmc5983ma22.get_measurement(); Serial1.write(mag_data22.bytes, 7); crc.add(mag_data22.bytes, 7);
+	auto mag_data23 = mmc5983ma23.get_measurement(); Serial1.write(mag_data23.bytes, 7); crc.add(mag_data23.bytes, 7);
+	auto mag_data24 = mmc5983ma24.get_measurement(); Serial1.write(mag_data24.bytes, 7); crc.add(mag_data24.bytes, 7);
+	auto mag_data25 = mmc5983ma25.get_measurement(); Serial1.write(mag_data25.bytes, 7); crc.add(mag_data25.bytes, 7);
 	// clang-format on
 
 	auto crc_value = std::bit_cast<std::array<uint8_t, 2>>(crc.calc());
@@ -229,46 +238,46 @@ void loop() {
 
 	// clang-format off
 	//common::println_time(now,
-	//	'\'', mmc5983ma01.sensor_name,  '\'', mmc5983ma01.get_measurement(), ",",
-	//	'\'', mmc5983ma02.sensor_name,  '\'', mmc5983ma02.get_measurement(), ",",
-	//	'\'', mmc5983ma03.sensor_name,  '\'', mmc5983ma03.get_measurement(), ",",
-	//	'\'', mmc5983ma04.sensor_name,  '\'', mmc5983ma04.get_measurement(), ",",
-	//	'\'', mmc5983ma05.sensor_name,  '\'', mmc5983ma05.get_measurement(), ",",
-	//	'\'', mmc5983ma06.sensor_name,  '\'', mmc5983ma06.get_measurement(), ",",
-	//	'\'', mmc5983ma07.sensor_name,  '\'', mmc5983ma07.get_measurement(), ",",
-	//	'\'', mmc5983ma08.sensor_name,  '\'', mmc5983ma08.get_measurement(), ",",
-	//	'\'', mmc5983ma09.sensor_name,  '\'', mmc5983ma09.get_measurement(), ",",
-	//	'\'', mmc5983ma10.sensor_name,  '\'', mmc5983ma10.get_measurement(), ",",
-	//	'\'', mmc5983ma11.sensor_name,  '\'', mmc5983ma11.get_measurement(), ",",
-	//	'\'', mmc5983ma12.sensor_name,  '\'', mmc5983ma12.get_measurement(), ",",
-	//	'\'', mmc5983ma13.sensor_name,  '\'', mmc5983ma13.get_measurement(), ",",
-	//	'\'', mmc5983ma14.sensor_name,  '\'', mmc5983ma14.get_measurement(), ",",
-	//	'\'', mmc5983ma15.sensor_name,  '\'', mmc5983ma15.get_measurement(), ",",
-	//	'\'', mmc5983ma16.sensor_name,  '\'', mmc5983ma16.get_measurement(), ",",
-	//	'\'', mmc5983ma17.sensor_name,  '\'', mmc5983ma17.get_measurement(), ",",
-	//	'\'', mmc5983ma18.sensor_name,  '\'', mmc5983ma18.get_measurement(), ",",
-	//	'\'', mmc5983ma19.sensor_name,  '\'', mmc5983ma19.get_measurement(), ",",
-	//	'\'', mmc5983ma20.sensor_name,  '\'', mmc5983ma20.get_measurement(), ",",
-	//	'\'', mmc5983ma21.sensor_name,  '\'', mmc5983ma21.get_measurement(), ",",
-	//	'\'', mmc5983ma22.sensor_name,  '\'', mmc5983ma22.get_measurement(), ",",
-	//	'\'', mmc5983ma23.sensor_name,  '\'', mmc5983ma23.get_measurement(), ",",
-	//	'\'', mmc5983ma24.sensor_name,  '\'', mmc5983ma24.get_measurement(), ",",
-	//	'\'', mmc5983ma25.sensor_name,  '\'', mmc5983ma25.get_measurement(), ",",
-	//	'\'', lis3mdl01.sensor_name,  '\'', lis3mdl01.get_measurement(), ",",
-	//	'\'', lis3mdl02.sensor_name,  '\'', lis3mdl02.get_measurement(), ",",
-	//	'\'', lis3mdl03.sensor_name,  '\'', lis3mdl03.get_measurement(), ",",
-	//	'\'', lis3mdl04.sensor_name,  '\'', lis3mdl04.get_measurement(), ",",
-	//	'\'', lis3mdl05.sensor_name,  '\'', lis3mdl05.get_measurement(), ",",
-	//	'\'', lis3mdl06.sensor_name,  '\'', lis3mdl06.get_measurement(), ",",
-	//	'\'', lis3mdl07.sensor_name,  '\'', lis3mdl07.get_measurement(), ",",
-	//	'\'', lis3mdl08.sensor_name,  '\'', lis3mdl08.get_measurement(), ",",
-	//	'\'', lis3mdl09.sensor_name,  '\'', lis3mdl09.get_measurement(), ",",
-	//	'\'', lis3mdl10.sensor_name,  '\'', lis3mdl10.get_measurement(), ",",
-	//	'\'', lis3mdl11.sensor_name,  '\'', lis3mdl11.get_measurement(), ",",
-	//	'\'', lis3mdl12.sensor_name,  '\'', lis3mdl12.get_measurement(), ",",
-	//	'\'', lis3mdl13.sensor_name,  '\'', lis3mdl13.get_measurement(), ",",
-	//	'\'', lis3mdl14.sensor_name,  '\'', lis3mdl14.get_measurement(), ",",
-	//	'\'', lis3mdl15.sensor_name,  '\'', lis3mdl15.get_measurement(), ",",
-	//	'\'', lis3mdl16.sensor_name,  '\'', lis3mdl16.get_measurement(), ";");
+	//	'\'', mmc5983ma01.sensor_name,  '\'', mmc5983ma01.get_measurement_float(), ",",
+	//	'\'', mmc5983ma02.sensor_name,  '\'', mmc5983ma02.get_measurement_float(), ",",
+	//	'\'', mmc5983ma03.sensor_name,  '\'', mmc5983ma03.get_measurement_float(), ",",
+	//	'\'', mmc5983ma04.sensor_name,  '\'', mmc5983ma04.get_measurement_float(), ",",
+	//	'\'', mmc5983ma05.sensor_name,  '\'', mmc5983ma05.get_measurement_float(), ",",
+	//	'\'', mmc5983ma06.sensor_name,  '\'', mmc5983ma06.get_measurement_float(), ",",
+	//	'\'', mmc5983ma07.sensor_name,  '\'', mmc5983ma07.get_measurement_float(), ",",
+	//	'\'', mmc5983ma08.sensor_name,  '\'', mmc5983ma08.get_measurement_float(), ",",
+	//	'\'', mmc5983ma09.sensor_name,  '\'', mmc5983ma09.get_measurement_float(), ",",
+	//	'\'', mmc5983ma10.sensor_name,  '\'', mmc5983ma10.get_measurement_float(), ",",
+	//	'\'', mmc5983ma11.sensor_name,  '\'', mmc5983ma11.get_measurement_float(), ",",
+	//	'\'', mmc5983ma12.sensor_name,  '\'', mmc5983ma12.get_measurement_float(), ",",
+	//	'\'', mmc5983ma13.sensor_name,  '\'', mmc5983ma13.get_measurement_float(), ",",
+	//	'\'', mmc5983ma14.sensor_name,  '\'', mmc5983ma14.get_measurement_float(), ",",
+	//	'\'', mmc5983ma15.sensor_name,  '\'', mmc5983ma15.get_measurement_float(), ",",
+	//	'\'', mmc5983ma16.sensor_name,  '\'', mmc5983ma16.get_measurement_float(), ",",
+	//	'\'', mmc5983ma17.sensor_name,  '\'', mmc5983ma17.get_measurement_float(), ",",
+	//	'\'', mmc5983ma18.sensor_name,  '\'', mmc5983ma18.get_measurement_float(), ",",
+	//	'\'', mmc5983ma19.sensor_name,  '\'', mmc5983ma19.get_measurement_float(), ",",
+	//	'\'', mmc5983ma20.sensor_name,  '\'', mmc5983ma20.get_measurement_float(), ",",
+	//	'\'', mmc5983ma21.sensor_name,  '\'', mmc5983ma21.get_measurement_float(), ",",
+	//	'\'', mmc5983ma22.sensor_name,  '\'', mmc5983ma22.get_measurement_float(), ",",
+	//	'\'', mmc5983ma23.sensor_name,  '\'', mmc5983ma23.get_measurement_float(), ",",
+	//	'\'', mmc5983ma24.sensor_name,  '\'', mmc5983ma24.get_measurement_float(), ",",
+	//	'\'', mmc5983ma25.sensor_name,  '\'', mmc5983ma25.get_measurement_float(), ",",
+	//	'\'', lis3mdl01.sensor_name,  '\'', lis3mdl01.get_measurement_float(), ",",
+	//	'\'', lis3mdl02.sensor_name,  '\'', lis3mdl02.get_measurement_float(), ",",
+	//	'\'', lis3mdl03.sensor_name,  '\'', lis3mdl03.get_measurement_float(), ",",
+	//	'\'', lis3mdl04.sensor_name,  '\'', lis3mdl04.get_measurement_float(), ",",
+	//	'\'', lis3mdl05.sensor_name,  '\'', lis3mdl05.get_measurement_float(), ",",
+	//	'\'', lis3mdl06.sensor_name,  '\'', lis3mdl06.get_measurement_float(), ",",
+	//	'\'', lis3mdl07.sensor_name,  '\'', lis3mdl07.get_measurement_float(), ",",
+	//	'\'', lis3mdl08.sensor_name,  '\'', lis3mdl08.get_measurement_float(), ",",
+	//	'\'', lis3mdl09.sensor_name,  '\'', lis3mdl09.get_measurement_float(), ",",
+	//	'\'', lis3mdl10.sensor_name,  '\'', lis3mdl10.get_measurement_float(), ",",
+	//	'\'', lis3mdl11.sensor_name,  '\'', lis3mdl11.get_measurement_float(), ",",
+	//	'\'', lis3mdl12.sensor_name,  '\'', lis3mdl12.get_measurement_float(), ",",
+	//	'\'', lis3mdl13.sensor_name,  '\'', lis3mdl13.get_measurement_float(), ",",
+	//	'\'', lis3mdl14.sensor_name,  '\'', lis3mdl14.get_measurement_float(), ",",
+	//	'\'', lis3mdl15.sensor_name,  '\'', lis3mdl15.get_measurement_float(), ",",
+	//	'\'', lis3mdl16.sensor_name,  '\'', lis3mdl16.get_measurement_float(), ";");
 	// clang-format on
 }

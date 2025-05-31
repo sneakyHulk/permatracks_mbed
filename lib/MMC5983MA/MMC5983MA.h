@@ -64,7 +64,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 		}
 	}
 
-	void stop_measurement_float() { start_measurement(); }
+	void start_measurement_float() { start_measurement(); }
 
 	common::MagneticFluxDensityData get_measurement_float() {
 		// Wait until measurement is completed or times out
@@ -93,21 +93,23 @@ class MMC5983MA final : public SFE_MMC5983MA {
 		    static_cast<float>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
 		    static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
 	}
-
+#pragma pack(push, 1)
 	struct MagneticFluxDensityDataRaw {
 		union {
 			struct {
-				int32_t x : 18;
-				int32_t y : 18;
-				int32_t z : 18;
-				uint16_t reserved : 10;
+				std::int32_t x : 18;
+				std::int32_t y : 18;
+				std::int32_t z : 18;
+				std::uint8_t reserved : 2;
 			};
-			struct {
-				uint8_t bytes[7];
-				uint8_t reserved2[1];
-			};
+			std::uint8_t bytes[7];
 		};
 	};
+#pragma pack(pop)
+
+	std::uint32_t get_scale_factor() const {
+		return (1U << (MMC5983MA_MODE_BITS - 1)) * (1000000 / MMC5983MA_FULL_SCALE_RANGE_UTESLA);  // in Tesla
+	}
 
 	MagneticFluxDensityDataRaw get_measurement() {
 		// Wait until measurement is completed or times out
@@ -132,10 +134,20 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			return {0, 0, 0};
 		}
 
-		return {static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1), static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)};
+		return {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(z_value) - (1 << (MMC5983MA_MODE_BITS - 1))};
 	}
 
 #undef private
    private:
 	using SFE_MMC5983MA::begin;
 };
+
+namespace common {
+	void print_low_level(MMC5983MA::MagneticFluxDensityDataRaw const& d) {
+		common::print_low_level(d.x);
+		common::print_low_level(',');
+		common::print_low_level(d.y);
+		common::print_low_level(',');
+		common::print_low_level(d.z);
+	}
+}  // namespace common

@@ -77,6 +77,8 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 		}
 	}
 
+	[[nodiscard]] common::MagneticFluxDensityData get_measurement_float() const { return {event.magnetic.y, -event.magnetic.x, event.magnetic.z}; }
+
 	void start_measurement() {
 		uint8_t buffer[6];
 
@@ -93,20 +95,42 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	struct MagneticFluxDensityDataRaw {
 		union {
 			struct {
-				int16_t x;
-				int16_t y;
-				int16_t z;
+				std::int16_t x;
+				std::int16_t y;
+				std::int16_t z;
 			};
-			uint8_t bytes[6];
+			std::uint8_t bytes[6];
 		};
 	};
-	// switch x and y because of datasheet
-	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const { return {y, static_cast<int16_t>(-x), z}; }
 
-	[[nodiscard]] common::MagneticFluxDensityData get_measurement_float() const { return {event.magnetic.y, -event.magnetic.x, event.magnetic.z}; }
+	std::uint32_t get_scale_factor() {
+		std::uint32_t scale;
+
+		switch (rangeBuffered) {
+			case LIS3MDL_RANGE_16_GAUSS: scale = 1711; break;
+			case LIS3MDL_RANGE_12_GAUSS: scale = 2281; break;
+			case LIS3MDL_RANGE_8_GAUSS: scale = 3421; break;
+			case LIS3MDL_RANGE_4_GAUSS: scale = 6842; break;
+		}
+
+		return scale * 10000;
+	}
+
+	// switch x and y because of datasheet
+	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const { return {y, static_cast<std::int16_t>(-x), z}; }
 
 #undef private
    private:
 	using Adafruit_LIS3MDL::begin_I2C;
 	using Adafruit_LIS3MDL::begin_SPI;
 };
+
+namespace common {
+	void print_low_level(LIS3MDL::MagneticFluxDensityDataRaw const& d) {
+		common::print_low_level(d.x);
+		common::print_low_level(',');
+		common::print_low_level(d.y);
+		common::print_low_level(',');
+		common::print_low_level(d.z);
+	}
+}  // namespace common
