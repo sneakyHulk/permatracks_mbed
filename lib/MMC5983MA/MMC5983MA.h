@@ -89,9 +89,10 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			return {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()};
 		}
 
+		// z-value is down (see datasheet)
 		return {static_cast<float>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
 		    static_cast<float>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
-		    static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
+		    -static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
 	}
 #pragma pack(push, 1)
 	struct MagneticFluxDensityDataRaw {
@@ -134,7 +135,8 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			return {0, 0, 0};
 		}
 
-		return {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(z_value) - (1 << (MMC5983MA_MODE_BITS - 1))};
+		// z-value is down (see datasheet)
+		return {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(-z_value) - (1 << (MMC5983MA_MODE_BITS - 1))};
 	}
 
 #undef private

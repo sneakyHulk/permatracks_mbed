@@ -175,7 +175,7 @@ void loop() {
 	lis3mdl15.start_measurement();
 	lis3mdl16.start_measurement();
 
-	constexpr std::array<uint8_t, 2> const header = {0xAA, 0x55};
+	constexpr std::array<uint8_t, 2> const header = {'H', 'i'};
 	Serial1.write(header.data(), 2);
 
 	auto const scale_lis3mdl = std::bit_cast<std::array<std::uint8_t, sizeof(lis3mdl01.get_scale_factor())>>(lis3mdl01.get_scale_factor());
