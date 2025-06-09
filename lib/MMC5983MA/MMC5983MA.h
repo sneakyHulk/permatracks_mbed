@@ -169,16 +169,17 @@ class MMC5983MA final : public SFE_MMC5983MA {
 		    static_cast<double>(static_cast<std::int32_t>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
 		    -static_cast<double>(static_cast<std::int32_t>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
 
-		MagneticFluxDensityDataRaw test = {static_cast<std::int32_t>(x_value) - 131072, static_cast<std::int32_t>(y_value) - 131072, -(static_cast<std::int32_t>(z_value) - 131072)}; // because of overflow z must be more than 18 bits
-		std::array<double, 3> test2 = {static_cast<double>(static_cast<std::int32_t>(test.x)) / static_cast<double>(get_scale_factor()) * 1e6,
-		    static_cast<double>(static_cast<std::int32_t>(test.y)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(test.z)) / static_cast<double>(get_scale_factor()) * 1e6};
+		MagneticFluxDensityDataRaw value = {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)),
+		    -(static_cast<std::int32_t>(z_value) - (1 << (MMC5983MA_MODE_BITS - 1)))};  // because of overflow z must be more than 18 bits
+		std::array<double, 3> test2 = {static_cast<double>(static_cast<std::int32_t>(value.x)) / static_cast<double>(get_scale_factor()) * 1e6,
+		    static_cast<double>(static_cast<std::int32_t>(value.y)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(value.z)) / static_cast<double>(get_scale_factor()) * 1e6};
 
 		if (std::abs(test1[0] - test2[0]) > 0.001 || std::abs(test1[1] - test2[1]) > 0.001 || std::abs(test1[2] - test2[2]) > 0.001) {
-			common::print_error("Difference between measurements!", test1[0], " vs. ", test2[0], ", ", test1[1], " vs. ", test2[1], ", ", test1[2], " vs. ", test2[2], ", ", static_cast<std::int32_t>(test.z), " vs. ", z_value);
+			common::print_error("Difference between measurements!", test1[0], " vs. ", test2[0], ", ", test1[1], " vs. ", test2[1], ", ", test1[2], " vs. ", test2[2], ", ", static_cast<std::int32_t>(value.z), " vs. ", z_value);
 		}
 
-		// z-value is down (see datasheet)
-		return {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(-z_value) - (1 << (MMC5983MA_MODE_BITS - 1))};
+		// z-value is down (see datasheet) (because of overflow z must be more than 18 bits)
+		return value;
 	}
 
 #undef private
