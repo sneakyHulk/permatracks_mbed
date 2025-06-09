@@ -117,7 +117,7 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	}
 
 	// switch x and y because of datasheet
-	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const { return {y, static_cast<std::int16_t>(-x), z}; }
+	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const { return {y, static_cast<std::int16_t>(x == std::numeric_limits<std::int16_t>::min() ? std::numeric_limits<std::int16_t>::max() : -x), z}; }
 
 #undef private
    private:

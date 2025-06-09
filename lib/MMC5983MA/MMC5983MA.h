@@ -128,9 +128,9 @@ class MMC5983MA final : public SFE_MMC5983MA {
 	struct MagneticFluxDensityDataRaw {
 		union {
 			struct {
-				std::int32_t x : 18;
-				std::int32_t y : 18;
-				std::int32_t z : 20;
+				std::int32_t x : 19;
+				std::int32_t y : 19;
+				std::int32_t z : 18;
 			};
 			std::uint8_t bytes[7];
 		};
@@ -165,12 +165,12 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			return {0, 0, 0};
 		}
 
-		std::array<double, 3> test1 = {static_cast<double>(static_cast<std::int32_t>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
-		    static_cast<double>(static_cast<std::int32_t>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
-		    -static_cast<double>(static_cast<std::int32_t>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
+		std::array<double, 3> test1 = {-static_cast<double>(static_cast<std::int32_t>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
+		    -static_cast<double>(static_cast<std::int32_t>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
+		    static_cast<double>(static_cast<std::int32_t>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
 
-		MagneticFluxDensityDataRaw value = {static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)),
-		    -(static_cast<std::int32_t>(z_value) - (1 << (MMC5983MA_MODE_BITS - 1)))};  // because of overflow z must be more than 18 bits
+		MagneticFluxDensityDataRaw value = {-(static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1))), -(static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1))),
+		    (static_cast<std::int32_t>(z_value) - (1 << (MMC5983MA_MODE_BITS - 1)))};  // because of overflow z must be more than 18 bits
 		std::array<double, 3> test2 = {static_cast<double>(static_cast<std::int32_t>(value.x)) / static_cast<double>(get_scale_factor()) * 1e6,
 		    static_cast<double>(static_cast<std::int32_t>(value.y)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(value.z)) / static_cast<double>(get_scale_factor()) * 1e6};
 
