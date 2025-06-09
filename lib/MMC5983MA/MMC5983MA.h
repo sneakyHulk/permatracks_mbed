@@ -18,7 +18,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 
 	explicit MMC5983MA(const char* sensor_name, uint8_t cs_pin, SPIClass* spi) : sensor_name(sensor_name), cs_pin(cs_pin), spi(spi) {}
 
-	void begin(uint16_t filter_bandwidth = 100, uint16_t continuous_mode_frequency = 100, uint16_t periodic_set_samples = 1, bool enable_automatic_set_reset = true, bool enable_continuous_mode = true) {
+	void begin(bool const enable_automatic_set_reset = true, bool const enable_continuous_mode = true, uint16_t const filter_bandwidth = 100, uint16_t const continuous_mode_frequency = 100, uint16_t const periodic_set_samples = 1) {
 		if (!SFE_MMC5983MA::begin(cs_pin, SPISettings(10000000, MSBFIRST, SPI_MODE0), *spi)) {  // 10MHz max
 			common::println_critical_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
@@ -51,6 +51,36 @@ class MMC5983MA final : public SFE_MMC5983MA {
 		}
 		common::print_time(millis(), '\'', sensor_name, '\'', " continuous mode set to: ");
 		common::println(isContinuousModeEnabled() ? "enabled" : "disabled");
+	}
+
+	bool performSetOperation() {
+		// Set the SET bit to perform a set operation.
+		// Do this using the shadow register. If we do it with setRegisterBit
+		// (read-modify-write) we end up setting the Auto_SR_en bit too as that
+		// always seems to read as 1...? I don't know why.
+		bool success = setShadowBit(INT_CTRL_0_REG, SET_OPERATION);
+
+		clearShadowBit(INT_CTRL_0_REG, SET_OPERATION, false);  // Clear the bit - in shadow memory only
+
+		// Wait for the set operation to complete (500ns).
+		// delay(1);
+
+		return success;
+	}
+
+	bool performResetOperation() {
+		// Set the RESET bit to perform a reset operation.
+		// Do this using the shadow register. If we do it with setRegisterBit
+		// (read-modify-write) we end up setting the Auto_SR_en bit too as that
+		// always seems to read as 1...? I don't know why.
+		bool success = setShadowBit(INT_CTRL_0_REG, RESET_OPERATION);
+
+		clearShadowBit(INT_CTRL_0_REG, RESET_OPERATION, false);  // Clear the bit - in shadow memory only
+
+		// Wait for the reset operation to complete (500ns).
+		// delay(1);
+
+		return success;
 	}
 
 	void start_measurement() {
@@ -133,6 +163,18 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 
 			return {0, 0, 0};
+		}
+
+		std::array<double, 3> test1 = {static_cast<float>(static_cast<int>(x_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
+		    static_cast<float>(static_cast<int>(y_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA,
+		    -static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA};
+
+		MagneticFluxDensityDataRaw test = {
+		    static_cast<std::int32_t>(x_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(y_value) - (1 << (MMC5983MA_MODE_BITS - 1)), static_cast<std::int32_t>(-z_value) - (1 << (MMC5983MA_MODE_BITS - 1))};
+		std::array<double, 3> test2 = {static_cast<double>(static_cast<std::int32_t>(test.x)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(test.y)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(test.z)) / static_cast<double>(get_scale_factor()) * 1e6};
+
+		if (std::abs(test1[0] - test2[0]) > 0.001 || std::abs(test1[1] - test2[1]) > 0.001 || std::abs(test1[2] - test2[2]) > 0.001) {
+			common::print_error("Difference between measurements!");
 		}
 
 		// z-value is down (see datasheet)

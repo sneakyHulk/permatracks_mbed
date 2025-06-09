@@ -90,31 +90,87 @@ void setup() {
 	lis3mdl15.begin();
 	lis3mdl16.begin();
 
-	mmc5983ma01.begin();
-	mmc5983ma02.begin();
-	mmc5983ma03.begin();
-	mmc5983ma04.begin();
-	mmc5983ma05.begin();
-	mmc5983ma06.begin();
-	mmc5983ma07.begin();
-	mmc5983ma08.begin();
-	mmc5983ma09.begin();
-	mmc5983ma10.begin();
-	mmc5983ma11.begin();
-	mmc5983ma12.begin();
-	mmc5983ma13.begin();
-	mmc5983ma14.begin();
-	mmc5983ma15.begin();
-	mmc5983ma16.begin();
-	mmc5983ma17.begin();
-	mmc5983ma18.begin();
-	mmc5983ma19.begin();
-	mmc5983ma20.begin();
-	mmc5983ma21.begin();
-	mmc5983ma22.begin();
-	mmc5983ma23.begin();
-	mmc5983ma24.begin();
-	mmc5983ma25.begin();
+	mmc5983ma01.begin(false, false);
+	mmc5983ma02.begin(false, false);
+	mmc5983ma03.begin(false, false);
+	mmc5983ma04.begin(false, false);
+	mmc5983ma05.begin(false, false);
+	mmc5983ma06.begin(false, false);
+	mmc5983ma07.begin(false, false);
+	mmc5983ma08.begin(false, false);
+	mmc5983ma09.begin(false, false);
+	mmc5983ma10.begin(false, false);
+	mmc5983ma11.begin(false, false);
+	mmc5983ma12.begin(false, false);
+	mmc5983ma13.begin(false, false);
+	mmc5983ma14.begin(false, false);
+	mmc5983ma15.begin(false, false);
+	mmc5983ma16.begin(false, false);
+	mmc5983ma17.begin(false, false);
+	mmc5983ma18.begin(false, false);
+	mmc5983ma19.begin(false, false);
+	mmc5983ma20.begin(false, false);
+	mmc5983ma21.begin(false, false);
+	mmc5983ma22.begin(false, false);
+	mmc5983ma23.begin(false, false);
+	mmc5983ma24.begin(false, false);
+	mmc5983ma25.begin(false, false);
+
+	mmc5983ma01.performSetOperation();
+	mmc5983ma02.performSetOperation();
+	mmc5983ma03.performSetOperation();
+	mmc5983ma04.performSetOperation();
+	mmc5983ma05.performSetOperation();
+	mmc5983ma06.performSetOperation();
+	mmc5983ma07.performSetOperation();
+	mmc5983ma08.performSetOperation();
+	mmc5983ma09.performSetOperation();
+	mmc5983ma10.performSetOperation();
+	mmc5983ma11.performSetOperation();
+	mmc5983ma12.performSetOperation();
+	mmc5983ma13.performSetOperation();
+	mmc5983ma14.performSetOperation();
+	mmc5983ma15.performSetOperation();
+	mmc5983ma16.performSetOperation();
+	mmc5983ma17.performSetOperation();
+	mmc5983ma18.performSetOperation();
+	mmc5983ma19.performSetOperation();
+	mmc5983ma20.performSetOperation();
+	mmc5983ma21.performSetOperation();
+	mmc5983ma22.performSetOperation();
+	mmc5983ma23.performSetOperation();
+	mmc5983ma24.performSetOperation();
+	mmc5983ma25.performSetOperation();
+
+	delay(1);
+
+	mmc5983ma01.performResetOperation();
+	mmc5983ma02.performResetOperation();
+	mmc5983ma03.performResetOperation();
+	mmc5983ma04.performResetOperation();
+	mmc5983ma05.performResetOperation();
+	mmc5983ma06.performResetOperation();
+	mmc5983ma07.performResetOperation();
+	mmc5983ma08.performResetOperation();
+	mmc5983ma09.performResetOperation();
+	mmc5983ma10.performResetOperation();
+	mmc5983ma11.performResetOperation();
+	mmc5983ma12.performResetOperation();
+	mmc5983ma13.performResetOperation();
+	mmc5983ma14.performResetOperation();
+	mmc5983ma15.performResetOperation();
+	mmc5983ma16.performResetOperation();
+	mmc5983ma17.performResetOperation();
+	mmc5983ma18.performResetOperation();
+	mmc5983ma19.performResetOperation();
+	mmc5983ma20.performResetOperation();
+	mmc5983ma21.performResetOperation();
+	mmc5983ma22.performResetOperation();
+	mmc5983ma23.performResetOperation();
+	mmc5983ma24.performResetOperation();
+	mmc5983ma25.performResetOperation();
+
+	delay(1);
 }
 
 void loop() {
@@ -205,6 +261,8 @@ void loop() {
 	Serial1.write(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 	crc.add(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 
+	delay(8);
+
 	// clang-format off
 	auto mag_data01 = mmc5983ma01.get_measurement(); Serial1.write(mag_data01.bytes, 7); crc.add(mag_data01.bytes, 7);
 	auto mag_data02 = mmc5983ma02.get_measurement(); Serial1.write(mag_data02.bytes, 7); crc.add(mag_data02.bytes, 7);
@@ -233,8 +291,64 @@ void loop() {
 	auto mag_data25 = mmc5983ma25.get_measurement(); Serial1.write(mag_data25.bytes, 7); crc.add(mag_data25.bytes, 7);
 	// clang-format on
 
+	mmc5983ma01.performSetOperation();
+	mmc5983ma02.performSetOperation();
+	mmc5983ma03.performSetOperation();
+	mmc5983ma04.performSetOperation();
+	mmc5983ma05.performSetOperation();
+	mmc5983ma06.performSetOperation();
+	mmc5983ma07.performSetOperation();
+	mmc5983ma08.performSetOperation();
+	mmc5983ma09.performSetOperation();
+	mmc5983ma10.performSetOperation();
+	mmc5983ma11.performSetOperation();
+	mmc5983ma12.performSetOperation();
+	mmc5983ma13.performSetOperation();
+	mmc5983ma14.performSetOperation();
+	mmc5983ma15.performSetOperation();
+	mmc5983ma16.performSetOperation();
+	mmc5983ma17.performSetOperation();
+	mmc5983ma18.performSetOperation();
+	mmc5983ma19.performSetOperation();
+	mmc5983ma20.performSetOperation();
+	mmc5983ma21.performSetOperation();
+	mmc5983ma22.performSetOperation();
+	mmc5983ma23.performSetOperation();
+	mmc5983ma24.performSetOperation();
+	mmc5983ma25.performSetOperation();
+
+	delay(1);
+
+	mmc5983ma01.performResetOperation();
+	mmc5983ma02.performResetOperation();
+	mmc5983ma03.performResetOperation();
+	mmc5983ma04.performResetOperation();
+	mmc5983ma05.performResetOperation();
+	mmc5983ma06.performResetOperation();
+	mmc5983ma07.performResetOperation();
+	mmc5983ma08.performResetOperation();
+	mmc5983ma09.performResetOperation();
+	mmc5983ma10.performResetOperation();
+	mmc5983ma11.performResetOperation();
+	mmc5983ma12.performResetOperation();
+	mmc5983ma13.performResetOperation();
+	mmc5983ma14.performResetOperation();
+	mmc5983ma15.performResetOperation();
+	mmc5983ma16.performResetOperation();
+	mmc5983ma17.performResetOperation();
+	mmc5983ma18.performResetOperation();
+	mmc5983ma19.performResetOperation();
+	mmc5983ma20.performResetOperation();
+	mmc5983ma21.performResetOperation();
+	mmc5983ma22.performResetOperation();
+	mmc5983ma23.performResetOperation();
+	mmc5983ma24.performResetOperation();
+	mmc5983ma25.performResetOperation();
+
 	auto crc_value = std::bit_cast<std::array<uint8_t, 2>>(crc.calc());
 	Serial1.write(crc_value.data(), 2);
+
+	delay(1);
 
 	// clang-format off
 	//common::println_time(now,
