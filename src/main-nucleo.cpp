@@ -1,5 +1,10 @@
 #include <Arduino.h>
 #include <Comp6DOF_n0m1.h>
+#include <SPI.h>
+
+#include <cstdint>
+
+#include "../../../.platformio/packages/framework-arduinoststm32/cores/arduino/pins_arduino_analog.h"
 
 #ifdef LIS3MDL
 #include <Adafruit_LIS3MDL.h>
@@ -18,11 +23,141 @@ Adafruit_MMC5603_RAW mmc5603;
 SFE_MMC5983MA mmc5983ma;
 #endif
 
+#ifdef AK09940A
+constexpr std::uint8_t CS_PIN = D10;
+
+SPIClass spi(PA7, PA6, PA1);
+
+constexpr std::uint8_t CNTL4 = 0x33;   // SRST bit (D0)
+constexpr std::uint8_t I2CDIS = 0x36;  // lock out I²C
+constexpr std::uint8_t CNTL3 = 0x32;   // MODE[4:0]
+constexpr std::uint8_t CNTL2 = 0x31;   // TEMP
+constexpr std::uint8_t CNTL1 = 0x30;   // MT2
+constexpr std::uint8_t ST = 0x0F;      // DRDY flag
+constexpr std::uint8_t ST1 = 0x10;     // ST1
+constexpr std::uint8_t ST2 = 0x1B;     // ST2
+constexpr std::uint8_t HXL = 0x11;     // mag data read start
+
+inline void spiWrite(uint8_t reg, uint8_t data) {
+	digitalWrite(CS_PIN, LOW);
+	spi.transfer(reg & 0x7F);  // bit-7 = 0 → write
+	spi.transfer(data);
+	digitalWrite(CS_PIN, HIGH);
+}
+
+inline uint8_t spiRead(uint8_t reg) {
+	digitalWrite(CS_PIN, LOW);
+	spi.transfer(reg | 0x80);  // bit-7 = 1 → read
+	uint8_t val = spi.transfer(0x00);
+	digitalWrite(CS_PIN, HIGH);
+	return val;
+}
+
+bool check_company_device_id() {
+	constexpr std::uint8_t WHO_AM_I1_ADDR = 0x00;
+	constexpr std::uint8_t WHO_AM_I2_ADDR = 0x01;
+
+	constexpr std::uint8_t EXPECTED_WIA1 = 0x48;  // Company ID ("AKM")
+	constexpr std::uint8_t EXPECTED_WIA2 = 0xA3;  // Device ID (AK09940A)
+
+	std::uint8_t wia1 = spiRead(WHO_AM_I1_ADDR);
+	Serial.print("WIA1: ");
+	Serial.println(wia1);
+
+	std::uint8_t wia2 = spiRead(WHO_AM_I2_ADDR);
+	Serial.print("WIA2: ");
+	Serial.println(wia2);
+
+	return (wia1 == EXPECTED_WIA1) && (wia2 == EXPECTED_WIA2);
+}
+
+void softReset() {
+	spiWrite(CNTL4, 0x01);  // SRST = 1 → soft reset
+	delay(10);              // > 100 µs Twait
+}
+
+void disableI2C() { spiWrite(I2CDIS, 0b00011011); }
+
+void startSingleMeasurement() {
+	spiWrite(CNTL3, 0b00010);  // MODE[4:0] = 0b00001 → single-measurement
+}
+
+bool waitDRDY(uint16_t timeout_ms = 2000) {
+	uint32_t t0 = millis();
+	while (millis() - t0 < timeout_ms) {
+		auto status = spiRead(ST);
+		// Serial.println(status);
+		if (status & 0x01)  // DRDY bit = 1?
+			return true;
+	}
+	return false;  // timeout
+}
+
+int32_t assemble18(uint8_t l, uint8_t m, uint8_t h) {
+	uint32_t raw = ((uint32_t)(h & 0x03) << 16) | ((uint32_t)m << 8) | l;
+	if (raw & 0x20000) raw -= 0x40000;  // sign-extend from bit-17
+	return (int32_t)raw;                // now in two’s-complement nT/10 (typ.)
+}
+
+#endif
+
 void setup() {
 	Serial.begin(115200);
 	while (!Serial) delay(10);
 
 	Serial.println("Hello World");
+
+	delay(1000);
+	constexpr auto x = D13;
+
+#ifdef AK09940A
+	pinMode(CS_PIN, OUTPUT);
+	digitalWrite(CS_PIN, HIGH);
+
+	delay(10);
+	spi.beginTransaction(SPISettings(8'000'000, MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
+	delay(10);
+
+	// softReset();
+	// disableI2C();
+
+	if (!check_company_device_id()) {
+		Serial.println("Error in 'check_company_device_id()'");
+	}
+
+	spiWrite(CNTL1, 0b0000'0000);
+	spiWrite(CNTL2, 0b0100'0000);
+	spiWrite(CNTL3, 0b0110'0001);
+
+	if (!waitDRDY()) {
+		Serial.println("Timeout waiting for DRDY");
+	} else {
+		//uint8_t reg = ST1 | 0x80; // 0x11 = HXL; 0x80 sets read bit
+		//uint8_t data[10] = {0};     // 3 bytes per axis
+//
+		//digitalWrite(CS_PIN, LOW);
+		//SPI.transfer(reg);         // Send register address with read bit
+		//for (int i = 0; i < 10; i++) {
+		//	data[i] = SPI.transfer(0x00); // Read 6 bytes
+		//}
+		//digitalWrite(CS_PIN, HIGH);
+//
+		//int32_t x_raw = ((int32_t)data[2] << 16) | ((int32_t)data[1] << 8) | data[0];
+		//int32_t y_raw = ((int32_t)data[5] << 16) | ((int32_t)data[4] << 8) | data[3];
+		//int32_t z_raw = ((int32_t)data[8] << 16) | ((int32_t)data[7] << 8) | data[6];
+//
+		//Serial.print("X: "); Serial.print(x_raw);
+		//Serial.print(" Y: "); Serial.print(y_raw);
+		//Serial.print(" Z: "); Serial.println(z_raw);
+
+		Serial.println(spiRead(ST1));
+		Serial.println(spiRead(0x11));
+		Serial.println(spiRead(0x12));
+		Serial.println(spiRead(0x13));
+		Serial.println(spiRead(0x14));
+		Serial.println(spiRead(ST2));
+	}
+#endif
 
 	// connect sensor:
 #ifdef LIS3MDL
@@ -266,7 +401,6 @@ void send_message(float const x, float const y, float const z, const char* senso
 	Serial.print(z, 5);
 	Serial.println('.');
 }
-
 
 void loop() {
 	if (uint32_t const current_time = millis(); next_heartbeat < current_time) {  // sends heartbeat every second
