@@ -142,7 +142,7 @@ void setup() {
 	digitalWrite(CS_PIN, HIGH);
 
 	delay(10);
-	spi.beginTransaction(SPISettings(3'000'000, MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
+	spi.beginTransaction(SPISettings(8'000'000, MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
 #endif
 
 	delay(1000);
