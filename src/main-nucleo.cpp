@@ -4,8 +4,6 @@
 
 #include <cstdint>
 
-#include "../../../.platformio/packages/framework-arduinoststm32/cores/arduino/pins_arduino_analog.h"
-
 #ifdef LIS3MDL
 #include <Adafruit_LIS3MDL.h>
 Adafruit_LIS3MDL lis3mdl;
