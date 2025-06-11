@@ -73,32 +73,24 @@ bool check_company_device_id() {
 
 void softReset() {
 	spiWrite(CNTL4, 0x01);  // SRST = 1 → soft reset
-	delay(10);              // > 100 µs Twait
+	delay(100);             // > 100 µs Twait
 }
 
-void disableI2C() { spiWrite(I2CDIS, 0b00011011); }
-
-void startSingleMeasurement() {
-	spiWrite(CNTL3, 0b00010);  // MODE[4:0] = 0b00001 → single-measurement
+void disableI2C() {
+	spiWrite(I2CDIS, 0b00011011);
+	delay(100);
 }
 
 bool waitDRDY(uint16_t timeout_ms = 2000) {
 	uint32_t t0 = millis();
 	while (millis() - t0 < timeout_ms) {
+		delayMicroseconds(10);
 		auto status = spiRead(ST);
-		// Serial.println(status);
 		if (status & 0x01)  // DRDY bit = 1?
 			return true;
 	}
 	return false;  // timeout
 }
-
-int32_t assemble18(uint8_t l, uint8_t m, uint8_t h) {
-	uint32_t raw = ((uint32_t)(h & 0x03) << 16) | ((uint32_t)m << 8) | l;
-	if (raw & 0x20000) raw -= 0x40000;  // sign-extend from bit-17
-	return (int32_t)raw;                // now in two’s-complement nT/10 (typ.)
-}
-
 #endif
 
 void setup() {
@@ -108,56 +100,6 @@ void setup() {
 	Serial.println("Hello World");
 
 	delay(1000);
-	constexpr auto x = D13;
-
-#ifdef AK09940A
-	pinMode(CS_PIN, OUTPUT);
-	digitalWrite(CS_PIN, HIGH);
-
-	delay(10);
-	spi.beginTransaction(SPISettings(8'000'000, MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
-	delay(10);
-
-	// softReset();
-	// disableI2C();
-
-	if (!check_company_device_id()) {
-		Serial.println("Error in 'check_company_device_id()'");
-	}
-
-	spiWrite(CNTL1, 0b0000'0000);
-	spiWrite(CNTL2, 0b0100'0000);
-	spiWrite(CNTL3, 0b0110'0001);
-
-	if (!waitDRDY()) {
-		Serial.println("Timeout waiting for DRDY");
-	} else {
-		//uint8_t reg = ST1 | 0x80; // 0x11 = HXL; 0x80 sets read bit
-		//uint8_t data[10] = {0};     // 3 bytes per axis
-//
-		//digitalWrite(CS_PIN, LOW);
-		//SPI.transfer(reg);         // Send register address with read bit
-		//for (int i = 0; i < 10; i++) {
-		//	data[i] = SPI.transfer(0x00); // Read 6 bytes
-		//}
-		//digitalWrite(CS_PIN, HIGH);
-//
-		//int32_t x_raw = ((int32_t)data[2] << 16) | ((int32_t)data[1] << 8) | data[0];
-		//int32_t y_raw = ((int32_t)data[5] << 16) | ((int32_t)data[4] << 8) | data[3];
-		//int32_t z_raw = ((int32_t)data[8] << 16) | ((int32_t)data[7] << 8) | data[6];
-//
-		//Serial.print("X: "); Serial.print(x_raw);
-		//Serial.print(" Y: "); Serial.print(y_raw);
-		//Serial.print(" Z: "); Serial.println(z_raw);
-
-		Serial.println(spiRead(ST1));
-		Serial.println(spiRead(0x11));
-		Serial.println(spiRead(0x12));
-		Serial.println(spiRead(0x13));
-		Serial.println(spiRead(0x14));
-		Serial.println(spiRead(ST2));
-	}
-#endif
 
 	// connect sensor:
 #ifdef LIS3MDL
@@ -195,9 +137,15 @@ void setup() {
 	mmc5983ma.softReset();
 
 	Serial.println("MMC5983MA Found!");
+#elifdef AK09940A
+	pinMode(CS_PIN, OUTPUT);
+	digitalWrite(CS_PIN, HIGH);
+
+	delay(10);
+	spi.beginTransaction(SPISettings(3'000'000, MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
 #endif
 
-	delay(5000);
+	delay(1000);
 	// configure sensor
 #ifdef LIS3MDL
 	lis3mdl.setPerformanceMode(LIS3MDL_ULTRAHIGHMODE);
@@ -381,9 +329,25 @@ void setup() {
 	//		mmc5603.readRawData(&x_value, &y_value, &z_value);
 	//	} while (!sixDOF.deviantSpread(x_value, y_value, z_value));
 	// } while (!sixDOF.calOffsets());
+#elifdef AK09940A
+	softReset();
+	disableI2C();
+
+	if (!check_company_device_id()) {
+		Serial.println("Error in 'check_company_device_id()'");
+	}
+
+	// Power down mode:
+	spiWrite(CNTL3, 0b0000'0000);
+	delay(100);
+	// disable Ultra low power drive setting
+	spiWrite(CNTL1, 0b0000'0000);
+	delay(100);
+	// Temperature Sensor enable
+	spiWrite(CNTL2, 0b0100'0000);
 #endif
 
-	delay(5000);
+	delay(1000);
 }
 
 uint32_t next_heartbeat = 0;
@@ -433,5 +397,112 @@ void loop() {
 	mmc5603.getEvent(&event);
 
 	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "MMC5603");
+#elifdef AK09940A
+	// single measurement mode enable
+	spiWrite(CNTL3, 0b0110'0001);
+
+	if (!waitDRDY()) {
+		Serial.println("Timeout waiting for DRDY");
+	} else {
+		// uint8_t reg = ST1 | 0x80; // 0x11 = HXL; 0x80 sets read bit
+		// uint8_t data[10] = {0};     // 3 bytes per axis
+		//
+		// digitalWrite(CS_PIN, LOW);
+		// SPI.transfer(reg);         // Send register address with read bit
+		// for (int i = 0; i < 10; i++) {
+		//	data[i] = SPI.transfer(0x00); // Read 6 bytes
+		//}
+		// digitalWrite(CS_PIN, HIGH);
+		//
+		// int32_t x_raw = ((int32_t)data[2] << 16) | ((int32_t)data[1] << 8) | data[0];
+		// int32_t y_raw = ((int32_t)data[5] << 16) | ((int32_t)data[4] << 8) | data[3];
+		// int32_t z_raw = ((int32_t)data[8] << 16) | ((int32_t)data[7] << 8) | data[6];
+		//
+		// Serial.print("X: "); Serial.print(x_raw);
+		// Serial.print(" Y: "); Serial.print(y_raw);
+		// Serial.print(" Z: "); Serial.println(z_raw);
+
+		delayMicroseconds(10);
+		spiRead(ST1);
+		delayMicroseconds(10);
+		std::uint8_t raw1 = spiRead(0x11);
+		delayMicroseconds(10);
+		std::uint8_t raw2 = spiRead(0x12);
+		delayMicroseconds(10);
+		std::uint8_t raw3 = spiRead(0x13);
+		delayMicroseconds(10);
+		std::uint8_t raw4 = spiRead(0x14);
+		delayMicroseconds(10);
+		std::uint8_t raw5 = spiRead(0x15);
+		delayMicroseconds(10);
+		std::uint8_t raw6 = spiRead(0x16);
+		delayMicroseconds(10);
+		std::uint8_t raw7 = spiRead(0x17);
+		delayMicroseconds(10);
+		std::uint8_t raw8 = spiRead(0x18);
+		delayMicroseconds(10);
+		std::uint8_t raw9 = spiRead(0x19);
+		delayMicroseconds(10);
+		std::uint8_t raw10 = spiRead(0x1a);
+		delayMicroseconds(10);
+		spiRead(ST2);
+
+		Serial.print("Temp Raw 10: ");
+		Serial.println(raw10);
+
+		double const temp = 30.0 - raw10 / 1.7;
+
+		Serial.print("Temp: ");
+		Serial.println(temp);
+
+		Serial.print("Raw 1-9: ");
+		Serial.print(raw1);
+		Serial.print(", ");
+		Serial.print(raw2);
+		Serial.print(", ");
+		Serial.print(raw3);
+		Serial.print(", ");
+		Serial.print(raw4);
+		Serial.print(", ");
+		Serial.print(raw5);
+		Serial.print(", ");
+		Serial.print(raw6);
+		Serial.print(", ");
+		Serial.print(raw7);
+		Serial.print(", ");
+		Serial.print(raw8);
+		Serial.print(", ");
+		Serial.println(raw9);
+
+		std::uint32_t const x_raw = (static_cast<std::uint32_t>(raw3 & 0x03) << 16) | (static_cast<std::uint32_t>(raw2) << 8) | static_cast<std::uint32_t>(raw1);
+		std::uint32_t const y_raw = (static_cast<std::uint32_t>(raw6 & 0x03) << 16) | (static_cast<std::uint32_t>(raw5) << 8) | static_cast<std::uint32_t>(raw4);
+		std::uint32_t const z_raw = (static_cast<std::uint32_t>(raw9 & 0x03) << 16) | (static_cast<std::uint32_t>(raw8) << 8) | static_cast<std::uint32_t>(raw7);
+
+		std::int32_t const x_raw2 = static_cast<std::int32_t>(x_raw & 0x20000 ? x_raw - 0x40000 : x_raw);
+		std::int32_t const y_raw2 = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
+		std::int32_t const z_raw2 = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
+
+		Serial.print("X: ");
+		Serial.print(x_raw2);
+		Serial.print(", Y: ");
+		Serial.print(y_raw);
+		Serial.print(", Z: ");
+		Serial.println(z_raw);
+
+		constexpr double scale = 0.01;
+
+		double const x_uT = x_raw2 * scale;
+		double const y_uT = y_raw2 * scale;
+		double const z_uT = z_raw2 * scale;
+
+		Serial.print("X: ");
+		Serial.print(x_uT, 2);
+		Serial.print(" uT, Y: ");
+		Serial.print(y_uT, 2);
+		Serial.print(" uT, Z: ");
+		Serial.println(z_uT, 2);
+
+		delay(1000);
+	}
 #endif
 }
