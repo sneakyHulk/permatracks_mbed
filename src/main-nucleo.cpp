@@ -1,27 +1,29 @@
 #include <Arduino.h>
-#include <Comp6DOF_n0m1.h>
 #include <SPI.h>
 
+#include <array>
+#include <bit>
 #include <cstdint>
 
-#ifdef LIS3MDL
+#include "AK09940A.h"
+#include "CRC16.h"
+
+#ifdef USE_LIS3MDL
 #include <Adafruit_LIS3MDL.h>
 Adafruit_LIS3MDL lis3mdl;
-#elifdef MLX90393
+#elifdef USE_MLX90393
 #include <Adafruit_MLX90393_RAW.h>
 Adafruit_MLX90393_RAW mlx90393;
-#elifdef MMC5603
+#elifdef USE_MMC5603
 #include <Adafruit_MMC56x3_RAW.h>
 Adafruit_MMC5603_RAW mmc5603;
-#elifdef MMC5983MA
+#elifdef USE_MMC5983MA
 #include <SparkFun_MMC5983MA_Arduino_Library.h>
 #include <Wire.h>
 #define MMC5983MA_MODE_BITS 18
 #define MMC5983MA_FULL_SCALE_RANGE_UTESLA 800
 SFE_MMC5983MA mmc5983ma;
-#endif
-
-#ifdef AK09940A
+#elifdef USE_AK09940A
 constexpr std::uint8_t CS_PIN = D10;
 
 SPIClass spi(PA7, PA6, PA1);
@@ -92,7 +94,7 @@ bool waitDRDY(uint16_t timeout_ms = 2000) {
 #endif
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(230400);
 	while (!Serial) delay(10);
 
 	Serial.println("Hello World");
@@ -100,7 +102,7 @@ void setup() {
 	delay(1000);
 
 	// connect sensor:
-#ifdef LIS3MDL
+#ifdef USE_LIS3MDL
 	if (!lis3mdl.begin_I2C()) {
 		Serial.println("Failed to find LIS3MDL chip");
 		while (true) {
@@ -108,7 +110,7 @@ void setup() {
 		}
 	}
 	Serial.println("LIS3MDL Found!");
-#elifdef MLX90393
+#elifdef USE_MLX90393
 	if (!mlx90393.begin_I2C(0x18)) {
 		Serial.println(": Failed to find MLX90393 chip");
 		while (true) {
@@ -116,7 +118,7 @@ void setup() {
 		}
 	}
 	Serial.println("MLX90393 Found!");
-#elifdef MMC5603
+#elifdef USE_MMC5603
 	if (!mmc5603.begin(MMC56X3_DEFAULT_ADDRESS, &Wire)) {
 		Serial.println("Failed to find MMC5603 chip");
 		while (true) {
@@ -124,7 +126,7 @@ void setup() {
 		}
 	}
 	Serial.println("MMC5603 Found!");
-#elifdef MMC5983MA
+#elifdef USE_MMC5983MA
 	Wire.begin();
 	if (!mmc5983ma.begin()) {
 		Serial.println("Failed to find MMC5983MA chip");
@@ -135,7 +137,7 @@ void setup() {
 	mmc5983ma.softReset();
 
 	Serial.println("MMC5983MA Found!");
-#elifdef AK09940A
+#elifdef USE_AK09940A
 	pinMode(CS_PIN, OUTPUT);
 	digitalWrite(CS_PIN, HIGH);
 
@@ -145,7 +147,7 @@ void setup() {
 
 	delay(1000);
 	// configure sensor
-#ifdef LIS3MDL
+#ifdef USE_LIS3MDL
 	lis3mdl.setPerformanceMode(LIS3MDL_ULTRAHIGHMODE);
 	Serial.print("Performance mode set to: ");
 	switch (lis3mdl.getPerformanceMode()) {
@@ -197,7 +199,7 @@ void setup() {
 		//                         true, // polarity
 		//                         false, // don't latch
 		//                         true); // enabled!
-#elifdef MLX90393
+#elifdef USE_MLX90393
 	mlx90393.setGain(MLX90393_GAIN_1X);
 	Serial.print("Gain set to: ");
 	switch (mlx90393.getGain()) {
@@ -262,7 +264,7 @@ void setup() {
 		case MLX90393_FILTER_1: Serial.println("1");
 		case MLX90393_FILTER_0: Serial.println("0");
 	}
-#elifdef MMC5603
+#elifdef USE_MMC5603
 	mmc5603.printSensorDetails();
 
 	mmc5603.setDataRate(100);
@@ -272,7 +274,7 @@ void setup() {
 	mmc5603.setContinuousMode(true);
 	Serial.print("Continuous Mode set to: ");
 	Serial.println("true");
-#elifdef MMC5983MA
+#elifdef USE_MMC5983MA
 	mmc5983ma.setFilterBandwidth(100);
 	Serial.print("Filter Bandwidth set to: ");
 	Serial.println(mmc5983ma.getFilterBandwidth());
@@ -294,7 +296,7 @@ void setup() {
 	Serial.println(mmc5983ma.isContinuousModeEnabled() ? "enabled" : "disabled");
 #endif
 		// hard-iron calibrate sensor
-#ifdef MMC5983MA
+#ifdef USE_MMC5983MA
 		// do {
 		//	uint32_t x_value = 0, y_value = 0, z_value = 0;
 		//	do {
@@ -304,14 +306,14 @@ void setup() {
 		//	Serial.println("MMC5983MA read fields until deviantSpread!");
 		// } while (!sixDOF.calOffsets());
 
-#elifdef LIS3MDL
+#elifdef USE_LIS3MDL
 		// do {
 		//	do {
 		//		delay(50);
 		//		lis3mdl.read();
 		//	} while (!sixDOF.deviantSpread(lis3mdl.x, lis3mdl.y, lis3mdl.z));
 		// } while (!sixDOF.calOffsets());
-#elifdef MLX90393
+#elifdef USE_MLX90393
 	// do {
 	//	int16_t x_value = 0, y_value = 0, z_value = 0;
 	//	do {
@@ -319,7 +321,7 @@ void setup() {
 	//		mlx90393.readRawData(&x_value, &y_value, &z_value);
 	//	} while (!sixDOF.deviantSpread(x_value, y_value, z_value));
 	// } while (!sixDOF.calOffsets());
-#elifdef MMC5603
+#elifdef USE_MMC5603
 	// do {
 	//	int32_t x_value = 0, y_value = 0, z_value = 0;
 	//	do {
@@ -327,12 +329,14 @@ void setup() {
 	//		mmc5603.readRawData(&x_value, &y_value, &z_value);
 	//	} while (!sixDOF.deviantSpread(x_value, y_value, z_value));
 	// } while (!sixDOF.calOffsets());
-#elifdef AK09940A
+#elifdef USE_AK09940A
 	softReset();
 	disableI2C();
 
-	if (!check_company_device_id()) {
+	while (!check_company_device_id()) {
 		Serial.println("Error in 'check_company_device_id()'");
+
+		delay(1000);
 	}
 
 	// Power down mode:
@@ -343,6 +347,8 @@ void setup() {
 	delay(100);
 	// Temperature Sensor enable
 	spiWrite(CNTL2, 0b0100'0000);
+	// set continous mode to 100Hz and low noise drive 2
+	spiWrite(CNTL3, 0b0110'1000);
 #endif
 
 	delay(1000);
@@ -371,7 +377,7 @@ void loop() {
 		Serial.println("Heartbeat: 'Nucleo'");
 	}
 
-#ifdef MMC5983MA
+#ifdef USE_MMC5983MA
 	uint32_t x_value = 0, y_value = 0, z_value = 0;
 	if (!mmc5983ma.getMeasurementXYZ(&x_value, &y_value, &z_value)) return;
 
@@ -380,46 +386,28 @@ void loop() {
 	float z = static_cast<float>(static_cast<int>(z_value) - (1 << MMC5983MA_MODE_BITS - 1)) / (1 << MMC5983MA_MODE_BITS - 1) * MMC5983MA_FULL_SCALE_RANGE_UTESLA;
 
 	send_message(x, y, z, "MMC5983MA");
-#elifdef LIS3MDL
+#elifdef USE_LIS3MDL
 	sensors_event_t event;
 	if (!lis3mdl.getEvent(&event)) return;
 
 	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "LIS3MDL");
-#elifdef MLX90393
+#elifdef USE_MLX90393
 	sensors_event_t event;
 	mlx90393.getEvent(&event);
 
 	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "MLX90393");
-#elifdef MMC5603
+#elifdef USE_MMC5603
 	sensors_event_t event;
 	mmc5603.getEvent(&event);
 
 	send_message(event.magnetic.x, event.magnetic.y, event.magnetic.z, "MMC5603");
-#elifdef AK09940A
+#elifdef USE_AK09940A
 	// single measurement mode enable
-	spiWrite(CNTL3, 0b0110'0001);
+	// spiWrite(CNTL3, 0b0110'0001);
 
 	if (!waitDRDY()) {
 		Serial.println("Timeout waiting for DRDY");
 	} else {
-		// uint8_t reg = ST1 | 0x80; // 0x11 = HXL; 0x80 sets read bit
-		// uint8_t data[10] = {0};     // 3 bytes per axis
-		//
-		// digitalWrite(CS_PIN, LOW);
-		// SPI.transfer(reg);         // Send register address with read bit
-		// for (int i = 0; i < 10; i++) {
-		//	data[i] = SPI.transfer(0x00); // Read 6 bytes
-		//}
-		// digitalWrite(CS_PIN, HIGH);
-		//
-		// int32_t x_raw = ((int32_t)data[2] << 16) | ((int32_t)data[1] << 8) | data[0];
-		// int32_t y_raw = ((int32_t)data[5] << 16) | ((int32_t)data[4] << 8) | data[3];
-		// int32_t z_raw = ((int32_t)data[8] << 16) | ((int32_t)data[7] << 8) | data[6];
-		//
-		// Serial.print("X: "); Serial.print(x_raw);
-		// Serial.print(" Y: "); Serial.print(y_raw);
-		// Serial.print(" Z: "); Serial.println(z_raw);
-
 		delayMicroseconds(10);
 		spiRead(ST1);
 		delayMicroseconds(10);
@@ -480,11 +468,33 @@ void loop() {
 		std::int32_t const y_raw2 = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
 		std::int32_t const z_raw2 = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
 
-		Serial.print("X: ");
+		AK09940A::MagneticFluxDensityDataRaw ak09940a;
+
+		ak09940a.x = x_raw2;
+		ak09940a.y = y_raw2;
+		ak09940a.z = z_raw2;
+
+		static CRC16 crc(0x8005, 0, false, true, true);
+		crc.restart();
+
+		constexpr std::array<uint8_t, 2> const header = {'H', 'i'};
+		Serial.write(header.data(), 2);
+
+		auto const scale_ak09940a = std::bit_cast<std::array<std::uint8_t, sizeof(AK09940A::get_scale_factor())> >(AK09940A::get_scale_factor());
+		Serial.write(scale_ak09940a.data(), scale_ak09940a.size());
+		crc.add(scale_ak09940a.data(), scale_ak09940a.size());
+
+		Serial.write(ak09940a.bytes, sizeof(AK09940A::MagneticFluxDensityDataRaw));
+		crc.add(ak09940a.bytes, sizeof(AK09940A::MagneticFluxDensityDataRaw));
+
+		auto crc_value = std::bit_cast<std::array<uint8_t, 2> >(crc.calc());
+		Serial.write(crc_value.data(), 2);
+
+		Serial.print("Xraw: ");
 		Serial.print(x_raw2);
-		Serial.print(", Y: ");
+		Serial.print(", Yraw: ");
 		Serial.print(y_raw);
-		Serial.print(", Z: ");
+		Serial.print(", Zraw: ");
 		Serial.println(z_raw);
 
 		constexpr double scale = 0.01;
@@ -495,12 +505,12 @@ void loop() {
 
 		Serial.print("X: ");
 		Serial.print(x_uT, 2);
-		Serial.print(" uT, Y: ");
+		Serial.print(", Y: ");
 		Serial.print(y_uT, 2);
-		Serial.print(" uT, Z: ");
+		Serial.print(", Z: ");
 		Serial.println(z_uT, 2);
 
-		delay(1000);
+		delay(18);
 	}
 #endif
 }
