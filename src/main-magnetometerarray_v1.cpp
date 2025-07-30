@@ -1,11 +1,20 @@
 #include <Arduino.h>
 #include <CRC16.h>
+#include <CRC8.h>
 #include <LIS3MDL.h>
 #include <MMC5983MA.h>
 #include <SPI.h>
 #include <common_output.h>
 
+#include <CircularBuffer.hpp>
 #include <bit>
+#include <cstring>
+
+std::array<std::uint64_t, 2> buf;
+static_assert(alignof(decltype(buf)) == alignof(std::uint64_t), "Misaligned!");
+
+std::array<std::uint8_t, 2> buf2;
+static_assert(alignof(decltype(buf2)) == alignof(std::uint8_t), "Misaligned!");
 
 auto SPIrow1 = SPIClass(PB5, PB4, PB3);
 auto SPIrow2 = SPIClass(PB15, PB14, PB13);
@@ -56,12 +65,39 @@ MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 
 HardwareSerial Serial1(PB7, PB6);
 
+std::uint64_t test3(std::array<std::uint8_t, 12>& arr) { return *new (arr.data() + 1) std::uint64_t; }
+
+std::uint64_t test4(const std::array<std::uint8_t, 12>& arr) {
+	std::uint64_t result;
+	std::memcpy(&result, arr.data() + 1, sizeof(result));
+	return result;
+}
+
+std::uint64_t test5(std::array<std::uint8_t, 12>& arr) { return *reinterpret_cast<std::uint64_t*>(arr.data() + 1); }
+
+#include <random>
+
 void setup() {
 	Serial1.begin(230400);
 	delay(2000);
 
 	// obligatory Hello World
 	common::println_time(millis(), "Hello World from Magnetometer Array V1");
+
+	std::array<std::uint8_t, 12> arr = {1, 2, 5, 6, 7, 8, 3, 4, 2, 2, 1, 2};
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> dist(0, 255);
+
+	for (auto& byte : arr) {
+		byte = static_cast<std::uint8_t>(dist(gen));
+	}
+
+	common::print(arr);
+
+	test5(arr);
+
+	common::print(arr);
 
 	// turn led on
 	pinMode(PC13, OUTPUT);
@@ -173,7 +209,125 @@ void setup() {
 	delay(1);
 }
 
+template <typename T, size_t S, typename IT = typename Helper::Index<(S <= UINT8_MAX), (S <= UINT16_MAX)>::Type>
+class InitializableCircularBuffer : public CircularBuffer<T, S, IT> {
+   public:
+	InitializableCircularBuffer(std::initializer_list<T> init) : CircularBuffer<T, S, IT>() {
+		for (auto const& e : init) {
+			unshift(e);
+		}
+	}
+	InitializableCircularBuffer(T value) : CircularBuffer<T, S, IT>() {
+		for (auto i = 0; i < S; ++i) {
+			unshift(value);
+		}
+	}
+	InitializableCircularBuffer() : CircularBuffer<T, S, IT>() {}
+};
+
+template <typename time_type>
+time_type send_time(std::uint8_t const i) {
+	CRC8 crc;
+
+	time_type time = 1000 * micros();
+	auto const timestamp = std::bit_cast<std::array<std::uint8_t, sizeof(time_type)>>(time);
+	Serial1.write(timestamp.data(), timestamp.size());
+	crc.add(timestamp.data(), timestamp.size());
+
+	Serial1.write(crc.calc());
+
+	Serial1.write(i);
+	Serial1.write(static_cast<std::uint8_t>('T'));
+
+	Serial1.flush();
+
+	return time;
+}
+
+template <typename time_type>
+std::tuple<time_type, time_type, time_type> receive_time(std::uint64_t const timeout, std::uint8_t const i) {
+	constexpr auto message_size = 2 * sizeof(time_type) + 1 + 2;
+	time_type received_time1 = 0;
+	time_type received_time2 = 0;
+	time_type receive_time = 0;
+
+	std::array<std::uint8_t, message_size> buffer;
+	CRC8 crc;
+
+	Serial1.readBytesUntil('T', buffer.data(), buffer.size());
+
+	common::println("TEST", buffer);
+
+	return {0, 0, 0};
+
+	// get message -> only if data is available increases the index
+	auto index = 0;
+	for (auto j = 0; j < message_size - 1; ++j) {
+		auto byte = Serial1.read();  // this is non-blocking
+
+		if (byte < 0) continue;
+		buffer[index++] = byte;
+	}
+
+	// gets the rest of the message if not get into timeout
+	do {
+		if (timeout > (receive_time = 1000 * micros())) return {0, 0, 0};
+
+		auto byte = Serial1.read();
+
+		if (byte < 0) continue;
+		buffer[index++] = byte;
+	} while (index < message_size - 1);
+
+	do {
+		auto byte = Serial1.read();
+		//common::println("TEST2", unsigned(buffer[message_size - 2]), ", ", unsigned(i));
+		if (byte < 0) continue;
+		buffer[index] = byte;
+
+		if (buffer[message_size - 1] != static_cast<std::uint8_t>('T')) goto shift;
+		//common::println("TEST", unsigned(buffer[message_size - 2]), ", ", unsigned(i));
+		if (buffer[message_size - 2] != i) goto shift;
+
+		crc.add(buffer.data(), 2 * sizeof(time_type));
+
+		// if (buffer[2 * sizeof(time_type)] != crc.calc()) goto shift;
+
+		std::memcpy(&received_time1, buffer.data(), sizeof(time_type));
+		std::memcpy(&received_time2, buffer.data() + sizeof(time_type), sizeof(time_type));
+
+		return {received_time1, received_time2, receive_time};
+
+	shift:
+		std::memmove(buffer.data(), buffer.data() + 1, buffer.size() - 1);
+	} while (timeout > (receive_time = 1000 * micros()));
+
+	return {0, 0, 0};
+}
+
+std::uint64_t sync_time() {
+start:
+	std::uint64_t average_offset = 0;
+
+	// average over 5 RTT
+	for (std::uint8_t i = '0'; i <= '9'; i += 2) {
+		auto const t0 = send_time<std::uint64_t>(i);
+		auto const [t1, t2, t3] = receive_time<std::uint64_t>(10000000, i + 1);  // 10ms timeout
+
+		if (!t1 || !t2 || !t3) goto start;  // RESTART
+
+		auto const offset = ((t3 - t0) - (t2 - t1)) / 2;
+		common::println("Offset ", i, ": ", offset);
+		average_offset += offset;
+	}
+
+	return average_offset / 5;
+}
+
 void loop() {
+	common::println(1000 * micros());
+	sync_time();
+
 	static CRC16 crc(0x8005, 0, false, true, true);
 
 	crc.restart();
@@ -214,6 +368,8 @@ void loop() {
 	mmc5983ma24.start_measurement();
 	mmc5983ma25.start_measurement();
 
+	std::uint64_t timestamp = micros();
+
 	lis3mdl01.start_measurement();
 	lis3mdl02.start_measurement();
 	lis3mdl03.start_measurement();
@@ -230,9 +386,6 @@ void loop() {
 	lis3mdl14.start_measurement();
 	lis3mdl15.start_measurement();
 	lis3mdl16.start_measurement();
-
-	constexpr std::array<uint8_t, 2> const header = {'H', 'i'};
-	Serial1.write(header.data(), 2);
 
 	auto const scale_lis3mdl = std::bit_cast<std::array<std::uint8_t, sizeof(lis3mdl01.get_scale_factor())>>(lis3mdl01.get_scale_factor());
 	Serial1.write(scale_lis3mdl.data(), scale_lis3mdl.size());
@@ -317,6 +470,10 @@ void loop() {
 	mmc5983ma24.performSetOperation();
 	mmc5983ma25.performSetOperation();
 
+	// auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
+	// Serial1.write(timestamp_.data(), timestamp_.size());
+	// crc.add(timestamp_.data(), timestamp_.size());
+
 	delay(1);
 
 	mmc5983ma01.performResetOperation();
@@ -346,7 +503,12 @@ void loop() {
 	mmc5983ma25.performResetOperation();
 
 	auto crc_value = std::bit_cast<std::array<uint8_t, 2>>(crc.calc());
-	Serial1.write(crc_value.data(), 2);
+	Serial1.write(crc_value.data(), crc_value.size());
+
+	constexpr std::array<uint8_t, 2> footer = {'0', 'M'};
+	Serial1.write(footer.data(), footer.size());
+
+	Serial1.flush();
 
 	delay(1);
 

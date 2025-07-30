@@ -3,8 +3,9 @@
 
 #include <cstdint>
 
-[[maybe_unused]] constexpr std::uint16_t operator""_u16(unsigned long long int num) { return static_cast<std::uint8_t>(num); }
-[[maybe_unused]] constexpr std::int16_t operator""_i16(unsigned long long int num) { return static_cast<std::uint8_t>(num); }
+[[maybe_unused]] constexpr std::uint16_t operator""_u16(unsigned long long int num) { return static_cast<std::uint16_t>(num); }
+[[maybe_unused]] constexpr std::int16_t operator""_i16(unsigned long long int num) { return static_cast<std::int16_t>(num); }
+[[maybe_unused]] constexpr std::uint8_t operator""_u8(unsigned long long int num) { return static_cast<std::uint8_t>(num); }
 
 namespace common {
 	struct MagneticFluxDensityData {
