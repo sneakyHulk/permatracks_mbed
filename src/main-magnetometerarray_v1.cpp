@@ -229,7 +229,7 @@ template <typename time_type>
 time_type send_time(std::uint8_t const i) {
 	CRC8 crc;
 
-	time_type time = 1000 * micros();
+	time_type time = 1000ULL * micros();
 	auto const timestamp = std::bit_cast<std::array<std::uint8_t, sizeof(time_type)>>(time);
 	Serial1.write(timestamp.data(), timestamp.size());
 	crc.add(timestamp.data(), timestamp.size());
@@ -257,8 +257,6 @@ std::tuple<time_type, time_type, time_type> receive_time(std::uint64_t const tim
 	Serial1.readBytesUntil('T', buffer.data(), buffer.size());
 
 	common::println("TEST", buffer);
-
-	return {0, 0, 0};
 
 	// get message -> only if data is available increases the index
 	auto index = 0;
