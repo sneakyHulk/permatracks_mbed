@@ -4,12 +4,12 @@
 #include <tuple>
 
 namespace common {
-	void print_low_level(std::integral auto const value) { Serial1.print(value); }
-	inline void print_low_level(char const value) { Serial1.print(value); }
-	inline void print_low_level(char const* const value) { Serial1.print(value); }
-	inline void print_low_level(double const value) { Serial1.print(value); }
-	inline void print_low_level(float const value) { Serial1.print(value); }
-	inline void println_low_level() { Serial1.println(); }
+	void print_low_level(std::integral auto const value) { Serial.print(value); }
+	inline void print_low_level(char const value) { Serial.print(value); }
+	inline void print_low_level(char const* const value) { Serial.print(value); }
+	inline void print_low_level(double const value) { Serial.print(value); }
+	inline void print_low_level(float const value) { Serial.print(value); }
+	inline void println_low_level() { Serial.println(); }
 
 	// make std::array printable
 	template <typename T, std::size_t SIZE>

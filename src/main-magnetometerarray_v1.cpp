@@ -1,20 +1,18 @@
 #include <Arduino.h>
+
+#undef Serial
+HardwareSerial Serial1(PB7, PB6);
+#define Serial Serial1
+
 #include <CRC16.h>
-#include <CRC8.h>
 #include <LIS3MDL.h>
 #include <MMC5983MA.h>
 #include <SPI.h>
 #include <common_output.h>
+#include <common_time.h>
 
-#include <CircularBuffer.hpp>
 #include <bit>
 #include <cstring>
-
-std::array<std::uint64_t, 2> buf;
-static_assert(alignof(decltype(buf)) == alignof(std::uint64_t), "Misaligned!");
-
-std::array<std::uint8_t, 2> buf2;
-static_assert(alignof(decltype(buf2)) == alignof(std::uint8_t), "Misaligned!");
 
 auto SPIrow1 = SPIClass(PB5, PB4, PB3);
 auto SPIrow2 = SPIClass(PB15, PB14, PB13);
@@ -63,94 +61,88 @@ MMC5983MA mmc5983ma23("MMC5983MA 23", PB11, &SPIrow2);
 MMC5983MA mmc5983ma24("MMC5983MA 24", PA11, &SPIrow3);
 MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 
-HardwareSerial Serial1(PB7, PB6);
+std::uint64_t time_delay = 0;
+std::uint64_t time_offset = 0;
 
-std::uint64_t test3(std::array<std::uint8_t, 12>& arr) { return *new (arr.data() + 1) std::uint64_t; }
+bool led_state = LOW;
 
-std::uint64_t test4(const std::array<std::uint8_t, 12>& arr) {
-	std::uint64_t result;
-	std::memcpy(&result, arr.data() + 1, sizeof(result));
-	return result;
+void blink_led(decltype(millis()) const interval) {
+	decltype(millis()) const timeout = millis() + interval;
+
+	while (millis() < timeout) {
+		digitalWrite(PC13, led_state = !led_state);
+
+		delay(100);
+	}
+	if (led_state) digitalWrite(PC13, LOW);
 }
 
-std::uint64_t test5(std::array<std::uint8_t, 12>& arr) { return *reinterpret_cast<std::uint64_t*>(arr.data() + 1); }
-
-#include <random>
-
 void setup() {
-	Serial1.begin(230400);
-	delay(2000);
+	// turn led on
+	pinMode(PC13, OUTPUT);
+	digitalWrite(PC13, led_state);
+
+	Serial.begin(230400);
+
+	blink_led(2000);
 
 	// obligatory Hello World
 	common::println_time(millis(), "Hello World from Magnetometer Array V1");
 
-	std::array<std::uint8_t, 12> arr = {1, 2, 5, 6, 7, 8, 3, 4, 2, 2, 1, 2};
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> dist(0, 255);
-
-	for (auto& byte : arr) {
-		byte = static_cast<std::uint8_t>(dist(gen));
-	}
-
-	common::print(arr);
-
-	test5(arr);
-
-	common::print(arr);
-
-	// turn led on
-	pinMode(PC13, OUTPUT);
-	digitalWrite(PC13, LOW);
-
 	// begin SPI
-	SPIrow1.begin();
-	SPIrow2.begin();
-	SPIrow3.begin();
+	// clang-format off
+	SPIrow1.begin(); digitalWrite(PC13, led_state = !led_state);
+	SPIrow2.begin(); digitalWrite(PC13, led_state = !led_state);
+	SPIrow3.begin(); digitalWrite(PC13, led_state = !led_state);
+	// clang-format on
 
 	// begin the lis3mdl magnetometer
-	lis3mdl01.begin();
-	lis3mdl02.begin();
-	lis3mdl03.begin();
-	lis3mdl04.begin();
-	lis3mdl05.begin();
-	lis3mdl06.begin();
-	lis3mdl07.begin();
-	lis3mdl08.begin();
-	lis3mdl09.begin();
-	lis3mdl10.begin();
-	lis3mdl11.begin();
-	lis3mdl12.begin();
-	lis3mdl13.begin();
-	lis3mdl14.begin();
-	lis3mdl15.begin();
-	lis3mdl16.begin();
+	// clang-format off
+	lis3mdl01.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl02.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl03.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl04.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl05.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl06.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl07.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl08.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl09.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl10.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl11.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl12.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl13.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl14.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl15.begin(); digitalWrite(PC13, led_state = !led_state);
+	lis3mdl16.begin(); digitalWrite(PC13, led_state = !led_state);
+	// clang-format on
 
-	mmc5983ma01.begin(false, false);
-	mmc5983ma02.begin(false, false);
-	mmc5983ma03.begin(false, false);
-	mmc5983ma04.begin(false, false);
-	mmc5983ma05.begin(false, false);
-	mmc5983ma06.begin(false, false);
-	mmc5983ma07.begin(false, false);
-	mmc5983ma08.begin(false, false);
-	mmc5983ma09.begin(false, false);
-	mmc5983ma10.begin(false, false);
-	mmc5983ma11.begin(false, false);
-	mmc5983ma12.begin(false, false);
-	mmc5983ma13.begin(false, false);
-	mmc5983ma14.begin(false, false);
-	mmc5983ma15.begin(false, false);
-	mmc5983ma16.begin(false, false);
-	mmc5983ma17.begin(false, false);
-	mmc5983ma18.begin(false, false);
-	mmc5983ma19.begin(false, false);
-	mmc5983ma20.begin(false, false);
-	mmc5983ma21.begin(false, false);
-	mmc5983ma22.begin(false, false);
-	mmc5983ma23.begin(false, false);
-	mmc5983ma24.begin(false, false);
-	mmc5983ma25.begin(false, false);
+	// clang-format off
+	mmc5983ma01.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma02.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma03.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma04.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma05.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma06.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma07.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma08.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma09.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma10.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma11.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma12.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma13.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma14.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma15.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma16.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma17.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma18.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma19.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma20.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma21.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma22.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma23.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma24.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	mmc5983ma25.begin(false, false); digitalWrite(PC13, led_state = !led_state);
+	// clang-format on
 
 	mmc5983ma01.performSetOperation();
 	mmc5983ma02.performSetOperation();
@@ -177,6 +169,10 @@ void setup() {
 	mmc5983ma23.performSetOperation();
 	mmc5983ma24.performSetOperation();
 	mmc5983ma25.performSetOperation();
+
+	delay(1);
+
+	digitalWrite(PC13, led_state = !led_state);
 
 	delay(1);
 
@@ -207,130 +203,20 @@ void setup() {
 	mmc5983ma25.performResetOperation();
 
 	delay(1);
-}
 
-template <typename T, size_t S, typename IT = typename Helper::Index<(S <= UINT8_MAX), (S <= UINT16_MAX)>::Type>
-class InitializableCircularBuffer : public CircularBuffer<T, S, IT> {
-   public:
-	InitializableCircularBuffer(std::initializer_list<T> init) : CircularBuffer<T, S, IT>() {
-		for (auto const& e : init) {
-			unshift(e);
-		}
-	}
-	InitializableCircularBuffer(T value) : CircularBuffer<T, S, IT>() {
-		for (auto i = 0; i < S; ++i) {
-			unshift(value);
-		}
-	}
-	InitializableCircularBuffer() : CircularBuffer<T, S, IT>() {}
-};
+	digitalWrite(PC13, led_state = LOW);
 
-template <typename time_type>
-time_type send_time(std::uint8_t const i) {
-	CRC8 crc;
+	std::tie(time_delay, time_offset) = common::sync_time();
 
-	time_type time = 1000ULL * micros();
-	auto const timestamp = std::bit_cast<std::array<std::uint8_t, sizeof(time_type)>>(time);
-	Serial1.write(timestamp.data(), timestamp.size());
-	crc.add(timestamp.data(), timestamp.size());
-
-	Serial1.write(crc.calc());
-
-	Serial1.write(i);
-	Serial1.write(static_cast<std::uint8_t>('T'));
-
-	Serial1.flush();
-
-	return time;
-}
-
-template <typename time_type>
-std::tuple<time_type, time_type, time_type> receive_time(std::uint64_t const timeout, std::uint8_t const i) {
-	constexpr auto message_size = 2 * sizeof(time_type) + 1 + 2;
-	time_type received_time1 = 0;
-	time_type received_time2 = 0;
-	time_type receive_time = 0;
-
-	std::array<std::uint8_t, message_size> buffer;
-	CRC8 crc;
-
-	Serial1.readBytesUntil('T', buffer.data(), buffer.size());
-
-	common::println("TEST", buffer);
-
-	// get message -> only if data is available increases the index
-	auto index = 0;
-	for (auto j = 0; j < message_size - 1; ++j) {
-		auto byte = Serial1.read();  // this is non-blocking
-
-		if (byte < 0) continue;
-		buffer[index++] = byte;
-	}
-
-	// gets the rest of the message if not get into timeout
-	do {
-		if (timeout > (receive_time = 1000 * micros())) return {0, 0, 0};
-
-		auto byte = Serial1.read();
-
-		if (byte < 0) continue;
-		buffer[index++] = byte;
-	} while (index < message_size - 1);
-
-	do {
-		auto byte = Serial1.read();
-		//common::println("TEST2", unsigned(buffer[message_size - 2]), ", ", unsigned(i));
-		if (byte < 0) continue;
-		buffer[index] = byte;
-
-		if (buffer[message_size - 1] != static_cast<std::uint8_t>('T')) goto shift;
-		//common::println("TEST", unsigned(buffer[message_size - 2]), ", ", unsigned(i));
-		if (buffer[message_size - 2] != i) goto shift;
-
-		crc.add(buffer.data(), 2 * sizeof(time_type));
-
-		// if (buffer[2 * sizeof(time_type)] != crc.calc()) goto shift;
-
-		std::memcpy(&received_time1, buffer.data(), sizeof(time_type));
-		std::memcpy(&received_time2, buffer.data() + sizeof(time_type), sizeof(time_type));
-
-		return {received_time1, received_time2, receive_time};
-
-	shift:
-		std::memmove(buffer.data(), buffer.data() + 1, buffer.size() - 1);
-	} while (timeout > (receive_time = 1000 * micros()));
-
-	return {0, 0, 0};
-}
-
-std::uint64_t sync_time() {
-start:
-	std::uint64_t average_offset = 0;
-
-	// average over 5 RTT
-	for (std::uint8_t i = '0'; i <= '9'; i += 2) {
-		auto const t0 = send_time<std::uint64_t>(i);
-		auto const [t1, t2, t3] = receive_time<std::uint64_t>(10000000, i + 1);  // 10ms timeout
-
-		if (!t1 || !t2 || !t3) goto start;  // RESTART
-
-		auto const offset = ((t3 - t0) - (t2 - t1)) / 2;
-		common::println("Offset ", i, ": ", offset);
-		average_offset += offset;
-	}
-
-	return average_offset / 5;
+	delay(1);
 }
 
 void loop() {
-	common::println(1000 * micros());
-	sync_time();
+	CRC16 crc(0x8005, 0, false, true, true);
 
-	static CRC16 crc(0x8005, 0, false, true, true);
+	digitalWrite(PC13, led_state = !led_state);
 
-	crc.restart();
 	static unsigned long last = 0;
-
 	unsigned long now = millis();
 	if (now - last > 20) common::print_warn("Took ", now - last, "ms!");
 	while (now - last < 20) {
@@ -366,7 +252,8 @@ void loop() {
 	mmc5983ma24.start_measurement();
 	mmc5983ma25.start_measurement();
 
-	std::uint64_t timestamp = micros();
+	// timestamp computation is here because the LIS3MDLs already have the measurements, whereas for the MMC5983MA they have to be obtained.
+	std::uint64_t timestamp = time_offset + 1000ULL * micros();
 
 	lis3mdl01.start_measurement();
 	lis3mdl02.start_measurement();
@@ -385,61 +272,63 @@ void loop() {
 	lis3mdl15.start_measurement();
 	lis3mdl16.start_measurement();
 
+	Serial.write(static_cast<std::uint8_t>('M'));
+
 	auto const scale_lis3mdl = std::bit_cast<std::array<std::uint8_t, sizeof(lis3mdl01.get_scale_factor())>>(lis3mdl01.get_scale_factor());
-	Serial1.write(scale_lis3mdl.data(), scale_lis3mdl.size());
+	Serial.write(scale_lis3mdl.data(), scale_lis3mdl.size());
 	crc.add(scale_lis3mdl.data(), scale_lis3mdl.size());
 
 	// clang-format off
-	auto mag_data26 = lis3mdl01.get_measurement(); Serial1.write(mag_data26.bytes, 6); crc.add(mag_data26.bytes, 6);
-	auto mag_data27 = lis3mdl02.get_measurement(); Serial1.write(mag_data27.bytes, 6); crc.add(mag_data27.bytes, 6);
-	auto mag_data28 = lis3mdl03.get_measurement(); Serial1.write(mag_data28.bytes, 6); crc.add(mag_data28.bytes, 6);
-	auto mag_data29 = lis3mdl04.get_measurement(); Serial1.write(mag_data29.bytes, 6); crc.add(mag_data29.bytes, 6);
-	auto mag_data30 = lis3mdl05.get_measurement(); Serial1.write(mag_data30.bytes, 6); crc.add(mag_data30.bytes, 6);
-	auto mag_data31 = lis3mdl06.get_measurement(); Serial1.write(mag_data31.bytes, 6); crc.add(mag_data31.bytes, 6);
-	auto mag_data32 = lis3mdl07.get_measurement(); Serial1.write(mag_data32.bytes, 6); crc.add(mag_data32.bytes, 6);
-	auto mag_data33 = lis3mdl08.get_measurement(); Serial1.write(mag_data33.bytes, 6); crc.add(mag_data33.bytes, 6);
-	auto mag_data34 = lis3mdl09.get_measurement(); Serial1.write(mag_data34.bytes, 6); crc.add(mag_data34.bytes, 6);
-	auto mag_data35 = lis3mdl10.get_measurement(); Serial1.write(mag_data35.bytes, 6); crc.add(mag_data35.bytes, 6);
-	auto mag_data36 = lis3mdl11.get_measurement(); Serial1.write(mag_data36.bytes, 6); crc.add(mag_data36.bytes, 6);
-	auto mag_data37 = lis3mdl12.get_measurement(); Serial1.write(mag_data37.bytes, 6); crc.add(mag_data37.bytes, 6);
-	auto mag_data38 = lis3mdl13.get_measurement(); Serial1.write(mag_data38.bytes, 6); crc.add(mag_data38.bytes, 6);
-	auto mag_data39 = lis3mdl14.get_measurement(); Serial1.write(mag_data39.bytes, 6); crc.add(mag_data39.bytes, 6);
-	auto mag_data40 = lis3mdl15.get_measurement(); Serial1.write(mag_data40.bytes, 6); crc.add(mag_data40.bytes, 6);
-	auto mag_data41 = lis3mdl16.get_measurement(); Serial1.write(mag_data41.bytes, 6); crc.add(mag_data41.bytes, 6);
+	auto mag_data26 = lis3mdl01.get_measurement(); Serial.write(mag_data26.bytes, 6); crc.add(mag_data26.bytes, 6);
+	auto mag_data27 = lis3mdl02.get_measurement(); Serial.write(mag_data27.bytes, 6); crc.add(mag_data27.bytes, 6);
+	auto mag_data28 = lis3mdl03.get_measurement(); Serial.write(mag_data28.bytes, 6); crc.add(mag_data28.bytes, 6);
+	auto mag_data29 = lis3mdl04.get_measurement(); Serial.write(mag_data29.bytes, 6); crc.add(mag_data29.bytes, 6);
+	auto mag_data30 = lis3mdl05.get_measurement(); Serial.write(mag_data30.bytes, 6); crc.add(mag_data30.bytes, 6);
+	auto mag_data31 = lis3mdl06.get_measurement(); Serial.write(mag_data31.bytes, 6); crc.add(mag_data31.bytes, 6);
+	auto mag_data32 = lis3mdl07.get_measurement(); Serial.write(mag_data32.bytes, 6); crc.add(mag_data32.bytes, 6);
+	auto mag_data33 = lis3mdl08.get_measurement(); Serial.write(mag_data33.bytes, 6); crc.add(mag_data33.bytes, 6);
+	auto mag_data34 = lis3mdl09.get_measurement(); Serial.write(mag_data34.bytes, 6); crc.add(mag_data34.bytes, 6);
+	auto mag_data35 = lis3mdl10.get_measurement(); Serial.write(mag_data35.bytes, 6); crc.add(mag_data35.bytes, 6);
+	auto mag_data36 = lis3mdl11.get_measurement(); Serial.write(mag_data36.bytes, 6); crc.add(mag_data36.bytes, 6);
+	auto mag_data37 = lis3mdl12.get_measurement(); Serial.write(mag_data37.bytes, 6); crc.add(mag_data37.bytes, 6);
+	auto mag_data38 = lis3mdl13.get_measurement(); Serial.write(mag_data38.bytes, 6); crc.add(mag_data38.bytes, 6);
+	auto mag_data39 = lis3mdl14.get_measurement(); Serial.write(mag_data39.bytes, 6); crc.add(mag_data39.bytes, 6);
+	auto mag_data40 = lis3mdl15.get_measurement(); Serial.write(mag_data40.bytes, 6); crc.add(mag_data40.bytes, 6);
+	auto mag_data41 = lis3mdl16.get_measurement(); Serial.write(mag_data41.bytes, 6); crc.add(mag_data41.bytes, 6);
 	// clang-format on
 
 	auto const scale_mmc5983ma = std::bit_cast<std::array<std::uint8_t, sizeof(mmc5983ma01.get_scale_factor())>>(mmc5983ma01.get_scale_factor());
-	Serial1.write(scale_mmc5983ma.data(), scale_mmc5983ma.size());
+	Serial.write(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 	crc.add(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 
 	delay(8);
 
 	// clang-format off
-	auto mag_data01 = mmc5983ma01.get_measurement(); Serial1.write(mag_data01.bytes, 7); crc.add(mag_data01.bytes, 7);
-	auto mag_data02 = mmc5983ma02.get_measurement(); Serial1.write(mag_data02.bytes, 7); crc.add(mag_data02.bytes, 7);
-	auto mag_data03 = mmc5983ma03.get_measurement(); Serial1.write(mag_data03.bytes, 7); crc.add(mag_data03.bytes, 7);
-	auto mag_data04 = mmc5983ma04.get_measurement(); Serial1.write(mag_data04.bytes, 7); crc.add(mag_data04.bytes, 7);
-	auto mag_data05 = mmc5983ma05.get_measurement(); Serial1.write(mag_data05.bytes, 7); crc.add(mag_data05.bytes, 7);
-	auto mag_data06 = mmc5983ma06.get_measurement(); Serial1.write(mag_data06.bytes, 7); crc.add(mag_data06.bytes, 7);
-	auto mag_data07 = mmc5983ma07.get_measurement(); Serial1.write(mag_data07.bytes, 7); crc.add(mag_data07.bytes, 7);
-	auto mag_data08 = mmc5983ma08.get_measurement(); Serial1.write(mag_data08.bytes, 7); crc.add(mag_data08.bytes, 7);
-	auto mag_data09 = mmc5983ma09.get_measurement(); Serial1.write(mag_data09.bytes, 7); crc.add(mag_data09.bytes, 7);
-	auto mag_data10 = mmc5983ma10.get_measurement(); Serial1.write(mag_data10.bytes, 7); crc.add(mag_data10.bytes, 7);
-	auto mag_data11 = mmc5983ma11.get_measurement(); Serial1.write(mag_data11.bytes, 7); crc.add(mag_data11.bytes, 7);
-	auto mag_data12 = mmc5983ma12.get_measurement(); Serial1.write(mag_data12.bytes, 7); crc.add(mag_data12.bytes, 7);
-	auto mag_data13 = mmc5983ma13.get_measurement(); Serial1.write(mag_data13.bytes, 7); crc.add(mag_data13.bytes, 7);
-	auto mag_data14 = mmc5983ma14.get_measurement(); Serial1.write(mag_data14.bytes, 7); crc.add(mag_data14.bytes, 7);
-	auto mag_data15 = mmc5983ma15.get_measurement(); Serial1.write(mag_data15.bytes, 7); crc.add(mag_data15.bytes, 7);
-	auto mag_data16 = mmc5983ma16.get_measurement(); Serial1.write(mag_data16.bytes, 7); crc.add(mag_data16.bytes, 7);
-	auto mag_data17 = mmc5983ma17.get_measurement(); Serial1.write(mag_data17.bytes, 7); crc.add(mag_data17.bytes, 7);
-	auto mag_data18 = mmc5983ma18.get_measurement(); Serial1.write(mag_data18.bytes, 7); crc.add(mag_data18.bytes, 7);
-	auto mag_data19 = mmc5983ma19.get_measurement(); Serial1.write(mag_data19.bytes, 7); crc.add(mag_data19.bytes, 7);
-	auto mag_data20 = mmc5983ma20.get_measurement(); Serial1.write(mag_data20.bytes, 7); crc.add(mag_data20.bytes, 7);
-	auto mag_data21 = mmc5983ma21.get_measurement(); Serial1.write(mag_data21.bytes, 7); crc.add(mag_data21.bytes, 7);
-	auto mag_data22 = mmc5983ma22.get_measurement(); Serial1.write(mag_data22.bytes, 7); crc.add(mag_data22.bytes, 7);
-	auto mag_data23 = mmc5983ma23.get_measurement(); Serial1.write(mag_data23.bytes, 7); crc.add(mag_data23.bytes, 7);
-	auto mag_data24 = mmc5983ma24.get_measurement(); Serial1.write(mag_data24.bytes, 7); crc.add(mag_data24.bytes, 7);
-	auto mag_data25 = mmc5983ma25.get_measurement(); Serial1.write(mag_data25.bytes, 7); crc.add(mag_data25.bytes, 7);
+	auto mag_data01 = mmc5983ma01.get_measurement(); Serial.write(mag_data01.bytes, 7); crc.add(mag_data01.bytes, 7);
+	auto mag_data02 = mmc5983ma02.get_measurement(); Serial.write(mag_data02.bytes, 7); crc.add(mag_data02.bytes, 7);
+	auto mag_data03 = mmc5983ma03.get_measurement(); Serial.write(mag_data03.bytes, 7); crc.add(mag_data03.bytes, 7);
+	auto mag_data04 = mmc5983ma04.get_measurement(); Serial.write(mag_data04.bytes, 7); crc.add(mag_data04.bytes, 7);
+	auto mag_data05 = mmc5983ma05.get_measurement(); Serial.write(mag_data05.bytes, 7); crc.add(mag_data05.bytes, 7);
+	auto mag_data06 = mmc5983ma06.get_measurement(); Serial.write(mag_data06.bytes, 7); crc.add(mag_data06.bytes, 7);
+	auto mag_data07 = mmc5983ma07.get_measurement(); Serial.write(mag_data07.bytes, 7); crc.add(mag_data07.bytes, 7);
+	auto mag_data08 = mmc5983ma08.get_measurement(); Serial.write(mag_data08.bytes, 7); crc.add(mag_data08.bytes, 7);
+	auto mag_data09 = mmc5983ma09.get_measurement(); Serial.write(mag_data09.bytes, 7); crc.add(mag_data09.bytes, 7);
+	auto mag_data10 = mmc5983ma10.get_measurement(); Serial.write(mag_data10.bytes, 7); crc.add(mag_data10.bytes, 7);
+	auto mag_data11 = mmc5983ma11.get_measurement(); Serial.write(mag_data11.bytes, 7); crc.add(mag_data11.bytes, 7);
+	auto mag_data12 = mmc5983ma12.get_measurement(); Serial.write(mag_data12.bytes, 7); crc.add(mag_data12.bytes, 7);
+	auto mag_data13 = mmc5983ma13.get_measurement(); Serial.write(mag_data13.bytes, 7); crc.add(mag_data13.bytes, 7);
+	auto mag_data14 = mmc5983ma14.get_measurement(); Serial.write(mag_data14.bytes, 7); crc.add(mag_data14.bytes, 7);
+	auto mag_data15 = mmc5983ma15.get_measurement(); Serial.write(mag_data15.bytes, 7); crc.add(mag_data15.bytes, 7);
+	auto mag_data16 = mmc5983ma16.get_measurement(); Serial.write(mag_data16.bytes, 7); crc.add(mag_data16.bytes, 7);
+	auto mag_data17 = mmc5983ma17.get_measurement(); Serial.write(mag_data17.bytes, 7); crc.add(mag_data17.bytes, 7);
+	auto mag_data18 = mmc5983ma18.get_measurement(); Serial.write(mag_data18.bytes, 7); crc.add(mag_data18.bytes, 7);
+	auto mag_data19 = mmc5983ma19.get_measurement(); Serial.write(mag_data19.bytes, 7); crc.add(mag_data19.bytes, 7);
+	auto mag_data20 = mmc5983ma20.get_measurement(); Serial.write(mag_data20.bytes, 7); crc.add(mag_data20.bytes, 7);
+	auto mag_data21 = mmc5983ma21.get_measurement(); Serial.write(mag_data21.bytes, 7); crc.add(mag_data21.bytes, 7);
+	auto mag_data22 = mmc5983ma22.get_measurement(); Serial.write(mag_data22.bytes, 7); crc.add(mag_data22.bytes, 7);
+	auto mag_data23 = mmc5983ma23.get_measurement(); Serial.write(mag_data23.bytes, 7); crc.add(mag_data23.bytes, 7);
+	auto mag_data24 = mmc5983ma24.get_measurement(); Serial.write(mag_data24.bytes, 7); crc.add(mag_data24.bytes, 7);
+	auto mag_data25 = mmc5983ma25.get_measurement(); Serial.write(mag_data25.bytes, 7); crc.add(mag_data25.bytes, 7);
 	// clang-format on
 
 	mmc5983ma01.performSetOperation();
@@ -468,11 +357,10 @@ void loop() {
 	mmc5983ma24.performSetOperation();
 	mmc5983ma25.performSetOperation();
 
-	// auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
-	// Serial1.write(timestamp_.data(), timestamp_.size());
-	// crc.add(timestamp_.data(), timestamp_.size());
-
-	delay(1);
+	// sent timestamp instead of 1ms delay
+	auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
+	Serial.write(timestamp_.data(), timestamp_.size());
+	crc.add(timestamp_.data(), timestamp_.size());
 
 	mmc5983ma01.performResetOperation();
 	mmc5983ma02.performResetOperation();
@@ -501,12 +389,9 @@ void loop() {
 	mmc5983ma25.performResetOperation();
 
 	auto crc_value = std::bit_cast<std::array<uint8_t, 2>>(crc.calc());
-	Serial1.write(crc_value.data(), crc_value.size());
+	Serial.write(crc_value.data(), crc_value.size());
 
-	constexpr std::array<uint8_t, 2> footer = {'0', 'M'};
-	Serial1.write(footer.data(), footer.size());
-
-	Serial1.flush();
+	Serial.write(static_cast<std::uint8_t>('M'));
 
 	delay(1);
 
