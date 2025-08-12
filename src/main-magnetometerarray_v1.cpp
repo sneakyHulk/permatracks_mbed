@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+// includes must follow after Serial definition
+
 #undef Serial
 HardwareSerial Serial1(PB7, PB6);
 #define Serial Serial1
@@ -8,11 +10,13 @@ HardwareSerial Serial1(PB7, PB6);
 #include <LIS3MDL.h>
 #include <MMC5983MA.h>
 #include <SPI.h>
+#include <common_message.h>
 #include <common_output.h>
 #include <common_time.h>
 
 #include <bit>
 #include <cstring>
+#include <utility>
 
 auto SPIrow1 = SPIClass(PB5, PB4, PB3);
 auto SPIrow2 = SPIClass(PB15, PB14, PB13);
@@ -63,6 +67,7 @@ MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 
 std::uint64_t time_delay = 0;
 std::uint64_t time_offset = 0;
+std::uint64_t timestamp = 0;
 
 bool led_state = LOW;
 
@@ -253,7 +258,11 @@ void loop() {
 	mmc5983ma25.start_measurement();
 
 	// timestamp computation is here because the LIS3MDLs already have the measurements, whereas for the MMC5983MA they have to be obtained.
-	std::uint64_t timestamp = time_offset + 1000ULL * micros();
+	std::tie(time_delay, time_offset) = common::sync_time();
+	if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
+		common::message("micros overflow detected!");
+		return;
+	}
 
 	lis3mdl01.start_measurement();
 	lis3mdl02.start_measurement();
@@ -301,7 +310,7 @@ void loop() {
 	Serial.write(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 	crc.add(scale_mmc5983ma.data(), scale_mmc5983ma.size());
 
-	delay(8);
+	delay(7);
 
 	// clang-format off
 	auto mag_data01 = mmc5983ma01.get_measurement(); Serial.write(mag_data01.bytes, 7); crc.add(mag_data01.bytes, 7);

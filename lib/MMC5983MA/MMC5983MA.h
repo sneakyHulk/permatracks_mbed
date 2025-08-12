@@ -20,7 +20,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 
 	void begin(bool const enable_automatic_set_reset = true, bool const enable_continuous_mode = true, uint16_t const filter_bandwidth = 100, uint16_t const continuous_mode_frequency = 100, uint16_t const periodic_set_samples = 1) {
 		if (!SFE_MMC5983MA::begin(cs_pin, SPISettings(10000000, MSBFIRST, SPI_MODE0), *spi)) {  // 10MHz max
-			common::println_critical_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
+			common::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 

@@ -20,7 +20,7 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	void begin(lis3mdl_performancemode_t performance_mode = LIS3MDL_ULTRAHIGHMODE, lis3mdl_operationmode_t operation_mode = LIS3MDL_CONTINUOUSMODE, lis3mdl_dataRate_t data_rate = LIS3MDL_DATARATE_80_HZ,
 	    lis3mdl_range_t range = LIS3MDL_RANGE_4_GAUSS) {
 		if (!begin_SPI(cs_pin, spi, 10000000)) {
-			common::println_critical_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
+			common::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 
