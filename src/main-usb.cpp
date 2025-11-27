@@ -2,32 +2,40 @@
 
 #include <cstdint>
 
+#include "USBSerial.h"
+
 bool led_state = LOW;
 void setup() {
 	pinMode(PA15, OUTPUT);
 	digitalWrite(PA15, led_state);
 
-	Serial.begin(115200);
+	Serial.begin();
 
 	delay(1000);
 	Serial.println("Hello over USB");
 }
 
+std::uint8_t packet[64] = {0x50, 0x54, 0x58, 0x31, 0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13, 0x20, 0x21, 0x22, 0x23, 0x30, 0x31, 0x32, 0x33, 0x40, 0x41, 0x42, 0x43, 0x50, 0x51, 0x52, 0x53, 0x60, 0x61, 0x62, 0x63, 0x70, 0x71, 0x72,
+    0x73, 0x80, 0x81, 0x82, 0x83, 0x90, 0x91, 0x92, 0x93, 0xA0, 0xA1, 0xA2, 0xA3, 0xB0, 0xB1, 0xB2, 0xB3, 0xC0, 0xC1, 0xC2, 0xC3, 0xD0, 0xD1, 0xD2, 0xD3, 0xE0, 0xE1, 0xE2, 0xE3};
+
 void loop() {
-	static std::uint64_t i = 0;
-	Serial.print(i++);
+	Serial.write(packet, 64);
 
-	digitalWrite(PA15, led_state = !led_state);
-	delay(100);
-
-	auto const value1 = analogRead(PA1);
-	auto const value2 = analogRead(PA2);
-	auto const value3 = analogRead(PA3);
-
-	Serial.print(": Value1: ");
-	Serial.print(value1);
-	Serial.print(" Value2: ");
-	Serial.print(value2);
-	Serial.print(" Value3: ");
-	Serial.println(value3);
+	// static std::uint64_t i = 0;
+	// Serial.print(i++);
+	//
+	// digitalWrite(PA15, led_state = !led_state);
+	// delay(100);
+	//
+	// auto const value1 = analogRead(PA1);
+	// auto const value2 = analogRead(PA2);
+	// auto const value3 = analogRead(PA3);
+	//
+	// Serial.print(": Value1: ");
+	// Serial.print(value1);
+	// Serial.print(" Value2: ");
+	// Serial.print(value2);
+	// Serial.print(" Value3: ");
+	// Serial.print(value3);
+	// Serial.write('\n');
 }
