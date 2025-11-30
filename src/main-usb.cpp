@@ -20,6 +20,8 @@ std::uint8_t packet[64] = {0x50, 0x54, 0x58, 0x31, 0x00, 0x01, 0x02, 0x03, 0x10,
 
 void loop() {
 	Serial.write(packet, 64);
+	delay(100);
+	digitalWrite(PA15, led_state = !led_state);
 
 	// static std::uint64_t i = 0;
 	// Serial.print(i++);
