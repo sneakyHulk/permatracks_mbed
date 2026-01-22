@@ -223,7 +223,7 @@ void loop() {
 
 	static unsigned long last = 0;
 	unsigned long now = millis();
-	if (now - last > 20) common::print_warn("Took ", now - last, "ms!");
+	if (now - last > 20) common::message("Took ", now - last, "ms!");
 	while (now - last < 20) {
 		delay(1);
 		now = millis();
@@ -258,7 +258,7 @@ void loop() {
 	mmc5983ma25.start_measurement();
 
 	// timestamp computation is here because the LIS3MDLs already have the measurements, whereas for the MMC5983MA they have to be obtained.
-	std::tie(time_delay, time_offset) = common::sync_time();
+	// std::tie(time_delay, time_offset) = common::sync_time();
 	if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
 		common::message("micros overflow detected!");
 		return;

@@ -33,41 +33,39 @@ namespace common {
 
 	template <typename time_type>
 	std::tuple<time_type, time_type, time_type> receive_time(CRC8& crc, time_type timeout = time_type(10000000ULL)) {  // 10ms
-		constexpr auto message_size = 1 + 2 * sizeof(time_type) + 1 + 1;
-		common::ring_buffer<time_type, message_size> timestamps;
-
-		std::array<std::uint8_t, message_size> buffer = {0};  // +1 for buffer print
-
-		time_type t1 = 0;
-		time_type t2 = 0;
+		constexpr auto message_size = 1 + sizeof(time_type) + sizeof(time_type) + 1 + 1;
+		std::array<std::uint8_t, message_size> buffer;
+		std::array<time_type, message_size> timestamps;
 
 		auto current_time = micros() * time_type(1000ULL);
 		timeout += current_time;
 
 		auto index = 0;
 		for (auto j = 0; j < message_size - 1; ++j) {
-			current_time = micros() * time_type(1000ULL);
 			auto byte = Serial.read();  // this is non-blocking
+			current_time = micros() * time_type(1000ULL);
 
-			if (byte < 0) continue;
+			if (byte < 0) continue;  // do a direct run
 
-			buffer[index++] = byte;
-			timestamps.push_back(current_time);
+			buffer[index] = byte;
+			timestamps[index] = current_time;
+			++index;
 		}
 
 		do {
 			if (timeout <= current_time) {
-				common::println("Early Timeout! Buffer: [", *reinterpret_cast<const char(*)[message_size + 1]>(buffer.data()), ']'); // message + 1 is ok here because common::message() only uses message size to print.
-				return {t1, t2, 0};
+				common::message("Early Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');  // message + 1 is ok here because common::message() only uses message size to print.
+				return {0, 0, 0};
 			}
 
-			current_time = micros() * time_type(1000ULL);
 			auto byte = Serial.read();
+			current_time = micros() * time_type(1000ULL);
 
-			if (byte < 0) continue;
+			if (byte < 0) continue;  // when not all data arrived, try until required number of bytes arrived
 
-			buffer[index++] = byte;
-			timestamps.push_back(current_time);
+			buffer[index] = byte;
+			timestamps[index] = current_time;
+			++index;
 		} while (index < message_size - 1);
 
 		do {
@@ -76,27 +74,36 @@ namespace common {
 
 			if (byte < 0) continue;
 
-			buffer[index] = byte;
-			timestamps.push_back(current_time);
+			buffer[index % message_size] = byte;
+			timestamps[index % message_size] = current_time;
 
-			if (buffer[message_size - 1] != static_cast<std::uint8_t>('T')) goto shift;
-			if (buffer[0] != static_cast<std::uint8_t>('T')) goto shift;
+			if (buffer[index++ % message_size] != static_cast<std::uint8_t>('T')) continue;
+			if (buffer[index % message_size] != static_cast<std::uint8_t>('T')) continue;
 
-			crc.add(buffer.data() + 1, 2 * sizeof(time_type));
+			for (auto j = 0; j < 2 * sizeof(time_type); ++j) {
+				crc.add(buffer[++index % message_size]);
+			}
 
-			if (buffer[message_size - 2] != crc.calc()) goto shift;
+			if (buffer[++index % message_size] != crc.calc()) {
+				index += 2;
+				continue;
+			}
 
-			std::memcpy(&t1, buffer.data() + 1, sizeof(time_type));
-			std::memcpy(&t2, buffer.data() + 1 + sizeof(time_type), sizeof(time_type));
+			index += 2;
 
-			return {t1, t2, timestamps.front()};
+			time_type timestamp = timestamps[index];
+			time_type t1 = std::bit_cast<time_type>(std::array<std::uint8_t, sizeof(time_type)>{buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size],
+			    buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size]});
 
-		shift:
-			std::memmove(buffer.data(), buffer.data() + 1, message_size - 1);
+			time_type t2 = std::bit_cast<time_type>(std::array<std::uint8_t, sizeof(time_type)>{buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size],
+			    buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size], buffer[++index % message_size]});
+
+			return {t1, t2, timestamp};
+
 		} while (current_time < timeout);
 
-		common::message("Timeout! Buffer: [", *reinterpret_cast<const char(*)[message_size + 1]>(buffer.data()), ']');
-		return {t1, t2, 0};
+		common::message("Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');
+		return {0, 0, 0};
 	}
 
 	inline std::tuple<std::uint64_t, std::uint64_t> sync_time() {
