@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 class AK09940A final {
    public:
 #pragma pack(push, 1)
