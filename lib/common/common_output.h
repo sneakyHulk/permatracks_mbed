@@ -42,13 +42,25 @@ namespace common {
 	struct println_time_loc {
 		explicit println_time_loc(std::integral auto timestamp, Args&&... args, std::source_location const location = std::source_location::current()) {
 			char buf[11]{};
-			print('[', pad0(millis(), buf), ',', location.file_name(), "]: ");
+			print('[', pad0(timestamp, buf), ',', location.file_name(), "]: ");
 			println(args...);
 		}
 	};
 
 	template <printable... Args>
 	println_time_loc(std::integral auto timestamp, Args&&... args) -> println_time_loc<Args...>;
+
+	template <printable... Args>
+	struct print_time_loc {
+		explicit print_time_loc(std::integral auto timestamp, Args&&... args, std::source_location const location = std::source_location::current()) {
+			char buf[11]{};
+			print('[', pad0(timestamp, buf), ',', location.file_name(), "]: ");
+			print(args...);
+		}
+	};
+
+	template <printable... Args>
+	print_time_loc(std::integral auto timestamp, Args&&... args) -> print_time_loc<Args...>;
 
 	inline constexpr auto BLK = "\033[0;30m";
 	inline constexpr auto RED = "\033[0;31m";
