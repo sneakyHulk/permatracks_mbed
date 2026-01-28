@@ -17,121 +17,128 @@ auto spi1 = SPIClass(PA_7, PA_6, PA_5);
 auto spi2 = SPIClass(PB_15, PB_14, PB_13);
 auto spi3 = SPIClass(PC_12, PC_11, PC_10);
 
-AK09940A ak000(&spi3, PA_9, true);
-AK09940A ak001(&spi3, PA_10, true);
-AK09940A ak002(&spi3, PH_13, true);
-AK09940A ak003(&spi3, PH_14, true);
-AK09940A ak004(&spi3, PH_15, true);
-AK09940A ak005(&spi3, PI_0, true);
-AK09940A ak006(&spi3, PI_3, true);
-AK09940A ak007(&spi3, PI_2, true);
-AK09940A ak008(&spi3, PI_1, true);
-AK09940A ak009(&spi3, PD_7, true);
-AK09940A ak010(&spi3, PD_6, true);
-AK09940A ak011(&spi3, PD_5, true);
-AK09940A ak012(&spi3, PD_4, true);
-AK09940A ak013(&spi3, PD_3, true);
-AK09940A ak014(&spi3, PD_2, true);
-AK09940A ak015(&spi3, PD_1, true);
-AK09940A ak016(&spi3, PD_0, true);
-AK09940A ak017(&spi3, PB_6, true);
-AK09940A ak018(&spi3, PB_5, true);
-AK09940A ak019(&spi3, PG_15, true);
-AK09940A ak020(&spi3, PG_14, true);
-AK09940A ak021(&spi3, PG_13, true);
-AK09940A ak022(&spi3, PG_12, true);
-AK09940A ak023(&spi3, PG_11, true);
-AK09940A ak024(&spi3, PG_10, true);
-AK09940A ak025(&spi3, PG_9, true);
-AK09940A ak026(&spi3, PI_6, true);
-AK09940A ak027(&spi3, PI_5, true);
-AK09940A ak028(&spi3, PI_4, true);
-AK09940A ak029(&spi3, PE_1, true);
-AK09940A ak030(&spi3, PE_0, true);
-AK09940A ak031(&spi3, PB_9, true);
-AK09940A ak032(&spi3, PB_8, true);
-AK09940A ak033(&spi3, PB_7, true);
+// clang-format off
+AK09940A ak000(&spi3, PA_9, false);
+AK09940A ak001(&spi3, PA_10,false);
+AK09940A ak002(&spi3, PH_13,false);
+AK09940A ak003(&spi3, PH_14,false);
+AK09940A ak004(&spi3, PH_15,false);
+AK09940A ak005(&spi3, PI_0, false);
+AK09940A ak006(&spi3, PI_3, false);
+AK09940A ak007(&spi3, PI_2, false);
+AK09940A ak008(&spi3, PI_1, false);
+AK09940A ak009(&spi3, PD_7, false);
+AK09940A ak010(&spi3, PD_6, false);
+AK09940A ak011(&spi3, PD_5, false);
+AK09940A ak012(&spi3, PD_4, false);
+AK09940A ak013(&spi3, PD_3, false);
+AK09940A ak014(&spi3, PD_2, false);
+AK09940A ak015(&spi3, PD_1, false);
+AK09940A ak016(&spi3, PD_0, false);
+AK09940A ak017(&spi3, PB_6, false);
+AK09940A ak018(&spi3, PB_5, false);
+AK09940A ak019(&spi3, PG_15,false);
+AK09940A ak020(&spi3, PG_14,false);
+AK09940A ak021(&spi3, PG_13,false);
+AK09940A ak022(&spi3, PG_12,false);
+AK09940A ak023(&spi3, PG_11,false);
+AK09940A ak024(&spi3, PG_10,false);
+AK09940A ak025(&spi3, PG_9, false);
+AK09940A ak026(&spi3, PI_6, false);
+AK09940A ak027(&spi3, PI_5, false);
+AK09940A ak028(&spi3, PI_4, false);
+AK09940A ak029(&spi3, PE_1, false);
+AK09940A ak030(&spi3, PE_0, false);
+AK09940A ak031(&spi3, PB_9, false);
+AK09940A ak032(&spi3, PB_8, false);
+AK09940A ak033(&spi3, PB_7, false);
 
-AK09940A ak034(&spi1, PF_0, true);
-AK09940A ak035(&spi1, PI_11, true);
-AK09940A ak036(&spi1, PI_10, true);
-AK09940A ak037(&spi1, PI_9, true);
-AK09940A ak038(&spi1, PE_6, true);
-AK09940A ak039(&spi1, PE_5, true);
-AK09940A ak040(&spi1, PE_4, true);
-AK09940A ak041(&spi1, PE_3, true);
-AK09940A ak042(&spi1, PE_2, true);
-AK09940A ak043(&spi1, PF_7, true);
-AK09940A ak044(&spi1, PF_8, true);
-AK09940A ak045(&spi1, PF_6, true);
-AK09940A ak046(&spi1, PF_5, true);
-AK09940A ak047(&spi1, PF_4, true);
-AK09940A ak048(&spi1, PF_3, true);
-AK09940A ak049(&spi1, PF_2, true);
-AK09940A ak050(&spi1, PF_1, true);
-AK09940A ak051(&spi1, PH_2, true);
-AK09940A ak052(&spi1, PA_2, true);
-AK09940A ak053(&spi1, PA_1, true);
-AK09940A ak054(&spi1, PC_3, true);
-AK09940A ak055(&spi1, PC_2, true);
-AK09940A ak056(&spi1, PC_1, true);
-AK09940A ak057(&spi1, PC_0, true);
-AK09940A ak058(&spi1, PF_10, true);
-AK09940A ak059(&spi1, PF_9, true);
-AK09940A ak060(&spi1, PB_0, true);
-AK09940A ak061(&spi1, PC_5, true);
-AK09940A ak062(&spi1, PC_4, true);
-AK09940A ak063(&spi1, PA_4, true);
-AK09940A ak064(&spi1, PA_3, true);
-AK09940A ak065(&spi1, PH_5, true);
-AK09940A ak066(&spi1, PH_4, true);
-AK09940A ak067(&spi1, PH_3, true);
-AK09940A ak068(&spi1, PE_7, true);
-AK09940A ak069(&spi1, PG_1, true);
-AK09940A ak070(&spi1, PG_0, true);
-AK09940A ak071(&spi1, PF_15, true);
-AK09940A ak072(&spi1, PF_14, true);
-AK09940A ak073(&spi1, PF_13, true);
-AK09940A ak074(&spi1, PF_12, true);
-AK09940A ak075(&spi1, PF_11, true);
-AK09940A ak076(&spi1, PB_1, true);
+AK09940A ak034(&spi1, PF_0, false);
+AK09940A ak035(&spi1, PI_11,false);
+AK09940A ak036(&spi1, PI_10,false);
+AK09940A ak037(&spi1, PI_9, false);
+AK09940A ak038(&spi1, PE_6, false);
+AK09940A ak039(&spi1, PE_5, false);
+AK09940A ak040(&spi1, PE_4, false);
+AK09940A ak041(&spi1, PE_3, false);
+AK09940A ak042(&spi1, PE_2, false);
+AK09940A ak043(&spi1, PF_7, false);
+AK09940A ak044(&spi1, PF_8, false);
+AK09940A ak045(&spi1, PF_6, false);
+AK09940A ak046(&spi1, PF_5, false);
+AK09940A ak047(&spi1, PF_4, false);
+AK09940A ak048(&spi1, PF_3, false);
+AK09940A ak049(&spi1, PF_2, false);
+AK09940A ak050(&spi1, PF_1, false);
+AK09940A ak051(&spi1, PH_2, false);
+AK09940A ak052(&spi1, PA_2, false);
+AK09940A ak053(&spi1, PA_1, false);
+AK09940A ak054(&spi1, PC_3, false);
+AK09940A ak055(&spi1, PC_2, false);
+AK09940A ak056(&spi1, PC_1, false);
+AK09940A ak057(&spi1, PC_0, false);
+AK09940A ak058(&spi1, PF_10,false);
+AK09940A ak059(&spi1, PF_9, false);
+AK09940A ak060(&spi1, PB_0, false);
+AK09940A ak061(&spi1, PC_5, false);
+AK09940A ak062(&spi1, PC_4, false);
+AK09940A ak063(&spi1, PA_4, false);
+AK09940A ak064(&spi1, PA_3, false);
+AK09940A ak065(&spi1, PH_5, false);
+AK09940A ak066(&spi1, PH_4, false);
+AK09940A ak067(&spi1, PH_3, false);
+AK09940A ak068(&spi1, PE_7, false);
+AK09940A ak069(&spi1, PG_1, false);
+AK09940A ak070(&spi1, PG_0, false);
+AK09940A ak071(&spi1, PF_15,false);
+AK09940A ak072(&spi1, PF_14,false);
+AK09940A ak073(&spi1, PF_13,false);
+AK09940A ak074(&spi1, PF_12,false);
+AK09940A ak075(&spi1, PF_11,false);
+AK09940A ak076(&spi1, PB_1, false);
 
-AK09940A ak077(&spi2, PE_15, true);
-AK09940A ak078(&spi2, PE_14, true);
-AK09940A ak079(&spi2, PE_13, true);
-AK09940A ak080(&spi2, PE_12, true);
-AK09940A ak081(&spi2, PE_11, true);
-AK09940A ak082(&spi2, PE_10, true);
-AK09940A ak083(&spi2, PE_9, true);
-AK09940A ak084(&spi2, PE_8, true);
-AK09940A ak085(&spi2, PC_6, true);
-AK09940A ak086(&spi2, PC_7, true);
-AK09940A ak087(&spi2, PC_8, true);
-AK09940A ak088(&spi2, PC_9, true);
-AK09940A ak089(&spi2, PA_8, true);
-AK09940A ak090(&spi2, PH_11, true);
-AK09940A ak091(&spi2, PH_10, true);
-AK09940A ak092(&spi2, PH_9, true);
-AK09940A ak093(&spi2, PH_6, true);
-AK09940A ak094(&spi2, PG_3, true);
-AK09940A ak095(&spi2, PG_4, true);
-AK09940A ak096(&spi2, PG_5, true);
-AK09940A ak097(&spi2, PH_7, true);
-AK09940A ak098(&spi2, PH_8, true);
-AK09940A ak099(&spi2, PG_6, true);
-AK09940A ak100(&spi2, PG_7, true);
-AK09940A ak101(&spi2, PG_8, true);
-AK09940A ak102(&spi2, PD_9, true);
-AK09940A ak103(&spi2, PD_8, true);
-AK09940A ak104(&spi2, PB_12, true);
-AK09940A ak105(&spi2, PD_11, true);
-AK09940A ak106(&spi2, PD_12, true);
-AK09940A ak107(&spi2, PD_13, true);
-AK09940A ak108(&spi2, PD_14, true);
-AK09940A ak109(&spi2, PD_15, true);
-AK09940A ak110(&spi2, PG_2, true);
+AK09940A ak077(&spi2, PE_15,false);
+AK09940A ak078(&spi2, PE_14,false);
+AK09940A ak079(&spi2, PE_13,false);
+AK09940A ak080(&spi2, PE_12,false);
+AK09940A ak081(&spi2, PE_11,false);
+AK09940A ak082(&spi2, PE_10,false);
+AK09940A ak083(&spi2, PE_9, false);
+AK09940A ak084(&spi2, PE_8, false);
+AK09940A ak085(&spi2, PC_6, false);
+AK09940A ak086(&spi2, PC_7, false);
+AK09940A ak087(&spi2, PC_8, false);
+AK09940A ak088(&spi2, PC_9, false);
+AK09940A ak089(&spi2, PA_8, false);
+AK09940A ak090(&spi2, PH_11,false);
+AK09940A ak091(&spi2, PH_10,false);
+AK09940A ak092(&spi2, PH_9, false);
+AK09940A ak093(&spi2, PH_6, false);
+AK09940A ak094(&spi2, PG_3, false);
+AK09940A ak095(&spi2, PG_4, false);
+AK09940A ak096(&spi2, PG_5, false);
+AK09940A ak097(&spi2, PH_7, false);
+AK09940A ak098(&spi2, PH_8, false);
+AK09940A ak099(&spi2, PG_6, false);
+AK09940A ak100(&spi2, PG_7, false);
+AK09940A ak101(&spi2, PG_8, false);
+AK09940A ak102(&spi2, PD_9, false);
+AK09940A ak103(&spi2, PD_8, false);
+AK09940A ak104(&spi2, PB_12,false);
+AK09940A ak105(&spi2, PD_11,false);
+AK09940A ak106(&spi2, PD_12,false);
+AK09940A ak107(&spi2, PD_13,false);
+AK09940A ak108(&spi2, PD_14,false);
+AK09940A ak109(&spi2, PD_15,false);
+AK09940A ak110(&spi2, PG_2, false);
+// clang-format on
 
 void setup() {
+	{  // set trigger pin
+		pinMode(PI_7, OUTPUT);
+		digitalWrite(PI_7, LOW);
+	}
+
 	{  // turn led on
 		pinMode(PD_10, OUTPUT);
 		digitalWrite(PD_10, led_state);
@@ -195,6 +202,43 @@ void setup() {
 	delay(100);
 
 	{  // connect AK09940A
+		delay(100);
+
+		ak077.begin();
+		ak078.begin();
+		ak079.begin();
+		ak080.begin();
+		ak081.begin();
+		ak082.begin();
+		ak083.begin();
+		ak084.begin();
+		ak085.begin();
+		ak086.begin();
+		ak087.begin();
+		ak088.begin();
+		ak089.begin();
+		ak090.begin();
+		ak091.begin();
+		ak092.begin();
+		ak093.begin();
+		ak094.begin();
+		ak095.begin();
+		ak096.begin();
+		ak097.begin();
+		ak098.begin();
+		ak099.begin();
+		ak100.begin();
+		ak101.begin();
+		ak102.begin();
+		ak103.begin();
+		ak104.begin();
+		ak105.begin();
+		ak106.begin();
+		ak107.begin();
+		ak108.begin();
+		ak109.begin();
+		ak110.begin();
+
 		ak000.begin();
 		ak001.begin();
 		ak002.begin();
@@ -273,41 +317,6 @@ void setup() {
 		ak074.begin();
 		ak075.begin();
 		ak076.begin();
-
-		ak077.begin();
-		ak078.begin();
-		ak079.begin();
-		ak080.begin();
-		ak081.begin();
-		ak082.begin();
-		ak083.begin();
-		ak084.begin();
-		ak085.begin();
-		ak086.begin();
-		ak087.begin();
-		ak088.begin();
-		ak089.begin();
-		ak090.begin();
-		ak091.begin();
-		ak092.begin();
-		ak093.begin();
-		ak094.begin();
-		ak095.begin();
-		ak096.begin();
-		ak097.begin();
-		ak098.begin();
-		ak099.begin();
-		ak100.begin();
-		ak101.begin();
-		ak102.begin();
-		ak103.begin();
-		ak104.begin();
-		ak105.begin();
-		ak106.begin();
-		ak107.begin();
-		ak108.begin();
-		ak109.begin();
-		ak110.begin();
 	}
 
 	Serial.println("Ready.");
@@ -332,6 +341,13 @@ void loop() {
 		digitalWrite(PD_10, led_state = !led_state);
 	}
 
+	{  // trigger sensors
+		digitalWrite(PI_7, HIGH);
+		delayMicroseconds(100);  // > 3us
+		digitalWrite(PI_7, LOW);
+		delay(5);  // > 3.1ms
+	}
+
 	{  // poll gyro
 		if (std::uint16_t samples = 0; gyro.FIFO_Get_Num_Samples(&samples) == LSM6DSV16X_OK) {
 			for (int i = 0; i < samples; i++) {
@@ -352,8 +368,8 @@ void loop() {
 					Serial.print(", ");
 					Serial.println(quaternions[2], 4);
 				} else {
-					Serial.print("Unknown tag: ");
-					Serial.println(tag);
+					// Serial.print("Unknown tag: ");
+					// Serial.println(tag);
 
 					break;
 				}
@@ -364,8 +380,8 @@ void loop() {
 		}
 	}
 
-	{  // poll AK09940A
-		ak000.start_measurement();
+	{   // poll AK09940A
+		/*ak000.start_measurement();
 		ak001.start_measurement();
 		ak002.start_measurement();
 		ak003.start_measurement();
@@ -477,7 +493,7 @@ void loop() {
 		ak107.start_measurement();
 		ak108.start_measurement();
 		ak109.start_measurement();
-		ak110.start_measurement();
+		ak110.start_measurement();*/
 
 		// clang-format off
 		auto const mag000 = ak000.get_measurement(); print(mag000);

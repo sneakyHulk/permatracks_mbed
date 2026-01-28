@@ -57,64 +57,62 @@ class AK09940A final {
 		pinMode(cs_pin, OUTPUT);
 		digitalWrite(cs_pin, HIGH);
 
-		// do soft reset
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " do soft reset...");
-		spiWrite(CNTL4, 0x01);  // SRST = 1 → soft reset
-		delay(100);             // > 100 µs Twait
-		common::println("Done!");
+		power_down();
 
 		// disable I2C
 		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable I2C...");
 		spiWrite(I2CDIS, 0b0001'1011);
-		delay(100);
+		delayMicroseconds(200);
 		common::println("Done!");
 
-		// check sensor
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " check company device id...");
-		while (!check_company_device_id()) {
-			common::print("Error! Retry...");
-
-			delay(1000);
+		// do soft reset
+		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " do soft reset...");
+		spiWrite(CNTL4, 0b0000'0001);  // SRST = 1 → soft reset
+		delayMicroseconds(2000);       // > 100 µs Twait
+		while (spiRead(CNTL4) & 0b0000'0001) {
+			common::print("Error! Waiting on soft reset to complete...");
+			delay(100);
 		}
 		common::println("Done!");
 
-		// power down mode
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " switch to power down mode...");
-		spiWrite(CNTL3, 0b0000'0000);
-		delay(100);
+		// check sensor
+		check_company_device_id();
+		check_company_device_id();
+		check_company_device_id();
+
+		power_down();
+
+		// enable temperature sensor
+		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " enable temperature sensor...");
+		spiWrite(CNTL2, 0b0100'0000);
+		delayMicroseconds(200);
 		common::println("Done!");
 
 		if (continuous) {
 			// disable ultra low power drive setting and data ready output
 			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and data ready output...");
-			spiWrite(CNTL1, 0b0000'0000);
-			delay(100);
-			common::println("Done!");
-
-			// enable temperature sensor
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " enable temperature sensor...");
-			spiWrite(CNTL2, 0b0100'0000);
+			std::uint8_t const cntl1 = spiRead(CNTL1);
+			spiWrite(CNTL1, cntl1 & 0b0100'0000);  // dont change up reserved RSV28 bit.
+			delayMicroseconds(200);
 			common::println("Done!");
 
 			// set continuous mode to 100Hz and low noise drive 2
 			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set continuous mode to 100Hz and low noise drive 2...");
 			spiWrite(CNTL3, 0b0110'1000);
+			delayMicroseconds(200);
 			common::println("Done!");
 		} else {
 			// disable ultra low power drive setting and external trigger pulse input
 			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and external trigger pulse input...");
-			spiWrite(CNTL1, 0b0010'0000);
-			delay(100);
-			common::println("Done!");
-
-			// enable temperature sensor
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " enable temperature sensor...");
-			spiWrite(CNTL2, 0b0100'0000);
+			std::uint8_t const cntl1 = spiRead(CNTL1);
+			spiWrite(CNTL1, (cntl1 & 0b0100'0000) | 0b0010'0000);  // dont change up reserved RSV28 bit.
+			delayMicroseconds(200);
 			common::println("Done!");
 
 			// set external trigger mode and low noise drive 2
 			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set external trigger mode and low noise drive 2...");
 			spiWrite(CNTL3, 0b0111'1000);
+			delayMicroseconds(200);
 			common::println("Done!");
 		}
 
@@ -127,50 +125,74 @@ class AK09940A final {
 		}
 	}
 
-	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const {
-		digitalWrite(cs_pin, LOW);
-		for (auto i = 0;; ++i) {
-			spi->transfer(ST1 | 0x80);
-			if (auto const status = spi->transfer(0x00); (status & 0x01) == 1) break;
-			if (i > 100) {
-				digitalWrite(cs_pin, HIGH);
-				common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " TIMEOUT DRDY!");
-				return {};
-			}
-			delayMicroseconds(10);
+	void power_down() const {
+		// power down mode
+		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " switch to power down mode...");
+		spiWrite(CNTL3, 0b0000'0000);
+		delayMicroseconds(1000);
+
+		while (spiRead(CNTL3) & 0b0001'1111) {
+			common::print("Error! Retry...");
+			spiWrite(CNTL3, 0b0000'0000);
+			delay(100);
 		}
 
-		std::uint8_t const raw0 = spi->transfer(0x00);
-		std::uint8_t const raw1 = spi->transfer(0x00);
-		std::uint8_t const raw2 = spi->transfer(0x00);
-		std::uint8_t const raw3 = spi->transfer(0x00);
-		std::uint8_t const raw4 = spi->transfer(0x00);
-		std::uint8_t const raw5 = spi->transfer(0x00);
-		std::uint8_t const raw6 = spi->transfer(0x00);
-		std::uint8_t const raw7 = spi->transfer(0x00);
-		std::uint8_t const raw8 = spi->transfer(0x00);
-		std::uint8_t const raw9 = spi->transfer(0x00);
+		common::println("Done!");
+	}
+
+	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const {
+		digitalWrite(cs_pin, LOW);
+
+		// do {
+		//	spi->transfer(ST | 0x80);
+		//
+		//	if (std::uint8_t const status = spi->transfer(0x00); status & 0b0000'0001) break;
+		//} while (true);
+
+		do {
+			spi->transfer(0x00 | 0x80);
+			std::uint8_t const wia1 = spi->transfer(0x00);
+			std::uint8_t const wia2 = spi->transfer(0x00);
+			std::uint8_t const rsv1 = spi->transfer(0x00);
+			std::uint8_t const rsv2 = spi->transfer(0x00);
+			std::uint8_t const st1 = spi->transfer(0x00);
+
+			common::print("WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "!");
+
+			if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2 && st1 & 0b0000'0001) break;
+		} while (true);
+
+		std::uint8_t const hxl = spi->transfer(0x00);
+		std::uint8_t const hxm = spi->transfer(0x00);
+		std::uint8_t const hxh = spi->transfer(0x00);
+		std::uint8_t const hyl = spi->transfer(0x00);
+		std::uint8_t const hym = spi->transfer(0x00);
+		std::uint8_t const hyh = spi->transfer(0x00);
+		std::uint8_t const hzl = spi->transfer(0x00);
+		std::uint8_t const hzm = spi->transfer(0x00);
+		std::uint8_t const hzh = spi->transfer(0x00);
+		std::uint8_t const tmps = spi->transfer(0x00);
 		std::uint8_t const dor = spi->transfer(0x00);
 
 		digitalWrite(cs_pin, HIGH);
 
 		if ((dor & 0x01) == 1) {
-			common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data has been skipped!");
+			// common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data has been skipped!");
 		}
 
-		double const temp = 30.0 - static_cast<std::int8_t>(raw9) / 1.7;
+		double const temp = 30.0 - static_cast<std::int8_t>(tmps) / 1.7;
 
-		common::println('\'', "AK09940A ", n, '\'', " ", temp, "°C");
+		// common::println('\'', "AK09940A ", n, '\'', " ", temp, "°C");
 
-		std::uint32_t const x_raw = (static_cast<std::uint32_t>(raw2 & 0x03) << 16) | (static_cast<std::uint32_t>(raw1) << 8) | static_cast<std::uint32_t>(raw0);
-		std::uint32_t const y_raw = (static_cast<std::uint32_t>(raw5 & 0x03) << 16) | (static_cast<std::uint32_t>(raw4) << 8) | static_cast<std::uint32_t>(raw3);
-		std::uint32_t const z_raw = (static_cast<std::uint32_t>(raw8 & 0x03) << 16) | (static_cast<std::uint32_t>(raw7) << 8) | static_cast<std::uint32_t>(raw6);
+		std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
+		std::uint32_t const y_raw = (static_cast<std::uint32_t>(hyh & 0x03) << 16) | (static_cast<std::uint32_t>(hym) << 8) | static_cast<std::uint32_t>(hyl);
+		std::uint32_t const z_raw = (static_cast<std::uint32_t>(hzh & 0x03) << 16) | (static_cast<std::uint32_t>(hzm) << 8) | static_cast<std::uint32_t>(hzl);
 
-		std::int32_t const x_raw2 = static_cast<std::int32_t>(x_raw & 0x20000 ? x_raw - 0x40000 : x_raw);
-		std::int32_t const y_raw2 = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
-		std::int32_t const z_raw2 = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
+		std::int32_t const hx = static_cast<std::int32_t>(x_raw & 0x20000 ? x_raw - 0x40000 : x_raw);
+		std::int32_t const hy = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
+		std::int32_t const hz = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
 
-		return MagneticFluxDensityDataRaw{.x = x_raw2, .y = y_raw2, .z = z_raw2};
+		return MagneticFluxDensityDataRaw{.x = hx, .y = hy, .z = hz};
 	}
 
    private:
@@ -189,15 +211,30 @@ class AK09940A final {
 		return val;
 	}
 
-	[[nodiscard]] bool check_company_device_id() const {
-		std::uint8_t const wia1 = spiRead(WHO_AM_I1_ADDR);
-		std::uint8_t const wia2 = spiRead(WHO_AM_I2_ADDR);
+	void check_company_device_id() const {
+		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " check company device id...");
 
-		if ((wia1 == EXPECTED_WIA1) && (wia2 == EXPECTED_WIA2)) {
-			return true;
+		digitalWrite(cs_pin, LOW);
+		delayMicroseconds(200);
+		spi->transfer(WHO_AM_I1_ADDR | 0x80);
+		std::uint8_t wia1 = spi->transfer(0x00);
+		std::uint8_t wia2 = spi->transfer(0x00);
+		digitalWrite(cs_pin, HIGH);
+		delayMicroseconds(200);
+
+		while ((wia1 != EXPECTED_WIA1) || (wia2 != EXPECTED_WIA2)) {
+			common::print("Error! WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "! Retry...");
+			delay(100);
+
+			digitalWrite(cs_pin, LOW);
+			delayMicroseconds(200);
+			spi->transfer(WHO_AM_I1_ADDR | 0x80);
+			wia1 = spi->transfer(0x00);
+			wia2 = spi->transfer(0x00);
+			digitalWrite(cs_pin, HIGH);
+			delayMicroseconds(200);
 		}
 
-		common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " does not match the expected values. WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "!");
-		return false;
+		common::println("Done!");
 	}
 };
