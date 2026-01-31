@@ -4,8 +4,7 @@
 
 #include <cstdint>
 
-#include "../common/common.h"
-#include "../common/common_output.h"
+#include <common2_output.h>
 
 class AK09940A final {
 	inline static std::uint8_t N = 0;
@@ -60,20 +59,20 @@ class AK09940A final {
 		power_down();
 
 		// disable I2C
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable I2C...");
+		common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable I2C...");
 		spiWrite(I2CDIS, 0b0001'1011);
 		delayMicroseconds(200);
-		common::println("Done!");
+		common2::println("Done!");
 
 		// do soft reset
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " do soft reset...");
+		common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " do soft reset...");
 		spiWrite(CNTL4, 0b0000'0001);  // SRST = 1 → soft reset
 		delayMicroseconds(2000);       // > 100 µs Twait
 		while (spiRead(CNTL4) & 0b0000'0001) {
-			common::print("Error! Waiting on soft reset to complete...");
+			common2::print("Error! Waiting on soft reset to complete...");
 			delay(100);
 		}
-		common::println("Done!");
+		common2::println("Done!");
 
 		// check sensor
 		check_company_device_id();
@@ -83,40 +82,40 @@ class AK09940A final {
 		power_down();
 
 		// enable temperature sensor
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " enable temperature sensor...");
+		common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " enable temperature sensor...");
 		spiWrite(CNTL2, 0b0100'0000);
 		delayMicroseconds(200);
-		common::println("Done!");
+		common2::println("Done!");
 
 		if (continuous) {
 			// disable ultra low power drive setting and data ready output
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and data ready output...");
+			common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and data ready output...");
 			std::uint8_t const cntl1 = spiRead(CNTL1);
 			spiWrite(CNTL1, cntl1 & 0b0100'0000);  // dont change up reserved RSV28 bit.
 			delayMicroseconds(200);
-			common::println("Done!");
+			common2::println("Done!");
 
 			// set continuous mode to 100Hz and low noise drive 2
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set continuous mode to 100Hz and low noise drive 2...");
+			common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set continuous mode to 100Hz and low noise drive 2...");
 			spiWrite(CNTL3, 0b0110'1000);
 			delayMicroseconds(200);
-			common::println("Done!");
+			common2::println("Done!");
 		} else {
 			// disable ultra low power drive setting and external trigger pulse input
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and external trigger pulse input...");
+			common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " disable Ultra low power drive setting and external trigger pulse input...");
 			std::uint8_t const cntl1 = spiRead(CNTL1);
 			spiWrite(CNTL1, (cntl1 & 0b0100'0000) | 0b0010'0000);  // dont change up reserved RSV28 bit.
 			delayMicroseconds(200);
-			common::println("Done!");
+			common2::println("Done!");
 
 			// set external trigger mode and low noise drive 2
-			common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set external trigger mode and low noise drive 2...");
+			common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set external trigger mode and low noise drive 2...");
 			spiWrite(CNTL3, 0b0111'1000);
 			delayMicroseconds(200);
-			common::println("Done!");
+			common2::println("Done!");
 		}
 
-		common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " Ready!");
+		common2::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " Ready!");
 	}
 
 	void start_measurement() const {
@@ -127,22 +126,23 @@ class AK09940A final {
 
 	void power_down() const {
 		// power down mode
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " switch to power down mode...");
+		common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " switch to power down mode...");
 		spiWrite(CNTL3, 0b0000'0000);
 		delayMicroseconds(1000);
 
 		while (spiRead(CNTL3) & 0b0001'1111) {
-			common::print("Error! Retry...");
+			common2::print("Error! Retry...");
 			spiWrite(CNTL3, 0b0000'0000);
 			delay(100);
 		}
 
-		common::println("Done!");
+		common2::println("Done!");
 	}
 
 	[[nodiscard]] MagneticFluxDensityDataRaw get_measurement() const {
 		digitalWrite(cs_pin, LOW);
 
+		// polling does not work! -> don't need for trg, because it is always one in the buffer after wait period!
 		// do {
 		//	spi->transfer(ST | 0x80);
 		//
@@ -157,7 +157,7 @@ class AK09940A final {
 			std::uint8_t const rsv2 = spi->transfer(0x00);
 			std::uint8_t const st1 = spi->transfer(0x00);
 
-			common::print("WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "!");
+			// common::print("WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "!");
 
 			if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2 && st1 & 0b0000'0001) break;
 		} while (true);
@@ -212,7 +212,7 @@ class AK09940A final {
 	}
 
 	void check_company_device_id() const {
-		common::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " check company device id...");
+		common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " check company device id...");
 
 		digitalWrite(cs_pin, LOW);
 		delayMicroseconds(200);
@@ -223,7 +223,7 @@ class AK09940A final {
 		delayMicroseconds(200);
 
 		while ((wia1 != EXPECTED_WIA1) || (wia2 != EXPECTED_WIA2)) {
-			common::print("Error! WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "! Retry...");
+			common2::print("Error! WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "! Retry...");
 			delay(100);
 
 			digitalWrite(cs_pin, LOW);
@@ -235,6 +235,6 @@ class AK09940A final {
 			delayMicroseconds(200);
 		}
 
-		common::println("Done!");
+		common2::println("Done!");
 	}
 };

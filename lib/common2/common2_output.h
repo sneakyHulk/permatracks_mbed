@@ -1,10 +1,10 @@
 #pragma once
-#include <common_printing.h>
+#include <common2_printing.h>
 
 #include <cstdio>
 #include <source_location>
 
-namespace common {
+namespace common2 {
 #ifdef __cpp_concepts
 	template <typename T>
 	concept printable = requires(const T& msg) {

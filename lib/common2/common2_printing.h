@@ -3,7 +3,7 @@
 #include <array>
 #include <tuple>
 
-namespace common {
+namespace common2 {
 	void print_low_level(std::integral auto const value) { Serial.print(value); }
 	inline void print_low_level(char const value) { Serial.print(value); }
 	inline void print_low_level(char const* const value) { Serial.print(value); }
@@ -52,4 +52,4 @@ namespace common {
 	[[maybe_unused]] void print_low_level(std::tuple<T...>&& tup) {
 		print_low_level(tup);
 	}
-}  // namespace common
+}  // namespace common2

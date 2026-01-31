@@ -1,18 +1,17 @@
 #pragma once
 
 #include <CRC8.h>
-#include <common.h>
-#include <common_ring_buffer.h>
+#include <common2.h>
+#include <common2_message.h>
+#include <common2_ring_buffer.h>
 
-#include <CircularBuffer.hpp>
-#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
-namespace common {
+namespace common2 {
 	template <typename time_type>
 	time_type send_time(CRC8& crc) {
 		Serial.write(static_cast<std::uint8_t>('T'));
@@ -54,7 +53,7 @@ namespace common {
 
 		do {
 			if (timeout <= current_time) {
-				common::message("Early Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');  // message + 1 is ok here because common::message() only uses message size to print.
+				common2::message("Early Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');  // message + 1 is ok here because common::message() only uses message size to print.
 				return {0, 0, 0};
 			}
 
@@ -102,12 +101,12 @@ namespace common {
 
 		} while (current_time < timeout);
 
-		common::message("Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');
+		common2::message("Timeout! Buffer: [", *reinterpret_cast<const char (*)[message_size + 1]>(buffer.data()), ']');
 		return {0, 0, 0};
 	}
 
 	inline std::tuple<std::uint64_t, std::uint64_t> sync_time() {
-		static common::ring_buffer<std::tuple<std::uint64_t, std::uint64_t>, 8> measurements;
+		static common2::ring_buffer<std::tuple<std::uint64_t, std::uint64_t>, 8> measurements;
 
 		measurements.pop();
 		do {
@@ -123,8 +122,10 @@ namespace common {
 			measurements.push_back({delay, offset});
 
 		} while (measurements.size() < 8);
-		common::message("Time synchronization complete.");
+		common2::message("Time synchronization complete.");
 
-		return common::median(measurements.array(), [](std::tuple<std::uint64_t, std::uint64_t> const& a, std::tuple<std::uint64_t, std::uint64_t> const& b) { return std::get<0>(a) < std::get<0>(b); });
+		return common2::median(
+		    measurements.array(), [](std::tuple<std::uint64_t, std::uint64_t> const& a, std::tuple<std::uint64_t, std::uint64_t> const& b) { return std::get<0>(a) < std::get<0>(b); },
+		    [](std::tuple<std::uint64_t, std::uint64_t> const& a, std::tuple<std::uint64_t, std::uint64_t> const& b) { return a; });
 	}
-}  // namespace common
+}  // namespace common2

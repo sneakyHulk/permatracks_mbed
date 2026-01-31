@@ -1,0 +1,3 @@
+[submodule "lib/msg"]
+	path = lib/msg
+	url = https://github.com/sneakyHulk/permatracks_msg.git

@@ -8,9 +8,9 @@
 #include <cstdint>
 #include <utility>
 
-#include "common_output.h"
+#include "common2_output.h"
 
-namespace common {
+namespace common2 {
 	template <std::size_t N>
 	[[maybe_unused]] void message_low_level(char const (&msg)[N], CRC8& crc) {
 		Serial.write(msg, N - 1);  // do not write \0
