@@ -1,3 +1,6 @@
 [submodule "lib/msg"]
 	path = lib/msg
 	url = https://github.com/sneakyHulk/permatracks_msg.git
+[submodule "lib/data_collection"]
+	path = lib/data_collection
+	url = https://github.com/sneakyHulk/permatracks_data_collection.git

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SPI.h>
-#include <common.h>
+#include <common2.h>
 
 #define private protected
 #include <SparkFun_MMC5983MA_Arduino_Library.h>
@@ -20,37 +20,37 @@ class MMC5983MA final : public SFE_MMC5983MA {
 
 	void begin(bool const enable_automatic_set_reset = true, bool const enable_continuous_mode = true, uint16_t const filter_bandwidth = 100, uint16_t const continuous_mode_frequency = 100, uint16_t const periodic_set_samples = 1) {
 		if (!SFE_MMC5983MA::begin(cs_pin, SPISettings(10000000, MSBFIRST, SPI_MODE0), *spi)) {  // 10MHz max
-			common::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
+			common2::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 
 		setFilterBandwidth(filter_bandwidth);
-		common::print_time(millis(), '\'', sensor_name, '\'', " filter bandwidth set to: ");
-		common::println(getFilterBandwidth());
+		common2::print_time(millis(), '\'', sensor_name, '\'', " filter bandwidth set to: ");
+		common2::println(getFilterBandwidth());
 
 		setContinuousModeFrequency(continuous_mode_frequency);
-		common::print_time(millis(), '\'', sensor_name, '\'', " continuous mode frequency set to: ");
-		common::println(getContinuousModeFrequency());
+		common2::print_time(millis(), '\'', sensor_name, '\'', " continuous mode frequency set to: ");
+		common2::println(getContinuousModeFrequency());
 
 		setPeriodicSetSamples(periodic_set_samples);
-		common::print_time(millis(), '\'', sensor_name, '\'', " periodic set samples set to: ");
-		common::println(getPeriodicSetSamples());
+		common2::print_time(millis(), '\'', sensor_name, '\'', " periodic set samples set to: ");
+		common2::println(getPeriodicSetSamples());
 
 		if (enable_automatic_set_reset) {
 			enableAutomaticSetReset();
 		} else {
 			disableAutomaticSetReset();
 		}
-		common::print_time(millis(), '\'', sensor_name, '\'', " automatic set/reset set to: ");
-		common::println(isAutomaticSetResetEnabled() ? "enabled" : "disabled");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " automatic set/reset set to: ");
+		common2::println(isAutomaticSetResetEnabled() ? "enabled" : "disabled");
 
 		if (enable_continuous_mode) {
 			enableContinuousMode();
 		} else {
 			disableContinuousMode();
 		}
-		common::print_time(millis(), '\'', sensor_name, '\'', " continuous mode set to: ");
-		common::println(isContinuousModeEnabled() ? "enabled" : "disabled");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " continuous mode set to: ");
+		common2::println(isContinuousModeEnabled() ? "enabled" : "disabled");
 	}
 
 	bool performSetOperation() {
@@ -90,13 +90,13 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			clearShadowBit(INT_CTRL_0_REG, TM_M, false);  // Clear the bit - in shadow memory only
 			SAFE_CALLBACK(errorCallback, SF_MMC5983MA_ERROR::BUS_ERROR);
 
-			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
+			common2::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 		}
 	}
 
 	void start_measurement_float() { start_measurement(); }
 
-	common::MagneticFluxDensityData get_measurement_float() {
+	MagneticFluxDensityData get_measurement_float() {
 		// Wait until measurement is completed or times out
 		uint16_t timeOut = getTimeout();
 
@@ -104,7 +104,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			// Wait a little so we won't flood MMC with requests
 			delay(1);
 			timeOut--;
-			common::println_warn_time_loc(millis(), "too slow");
+			common2::println_warn_time_loc(millis(), "too slow");
 		}
 
 		clearShadowBit(INT_CTRL_0_REG, TM_M, false);  // Clear the bit - in shadow memory only
@@ -114,7 +114,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 
 		uint32_t x_value = 0, y_value = 0, z_value = 0;
 		if (!readFieldsXYZ(&x_value, &y_value, &z_value) || timeOut == 0) {
-			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
+			common2::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 
 			return {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()};
 		}
@@ -150,7 +150,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 			// Wait a little so we won't flood MMC with requests
 			delay(1);
 			timeOut--;
-			common::println_warn_time_loc(millis(), sensor_name, " too slow");
+			common2::println_warn_time_loc(millis(), sensor_name, " too slow");
 		}
 
 		clearShadowBit(INT_CTRL_0_REG, TM_M, false);  // Clear the bit - in shadow memory only
@@ -160,7 +160,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 
 		uint32_t x_value = 0, y_value = 0, z_value = 0;
 		if (!readFieldsXYZ(&x_value, &y_value, &z_value) || timeOut == 0) {
-			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
+			common2::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 
 			return {0, 0, 0};
 		}
@@ -175,7 +175,7 @@ class MMC5983MA final : public SFE_MMC5983MA {
 		    static_cast<double>(static_cast<std::int32_t>(value.y)) / static_cast<double>(get_scale_factor()) * 1e6, static_cast<double>(static_cast<std::int32_t>(value.z)) / static_cast<double>(get_scale_factor()) * 1e6};
 
 		if (std::abs(test1[0] - test2[0]) > 0.001 || std::abs(test1[1] - test2[1]) > 0.001 || std::abs(test1[2] - test2[2]) > 0.001) {
-			common::print_error("Difference between measurements!", test1[0], " vs. ", test2[0], ", ", test1[1], " vs. ", test2[1], ", ", test1[2], " vs. ", test2[2], ", ", static_cast<std::int32_t>(value.z), " vs. ", z_value);
+			common2::print_error("Difference between measurements!", test1[0], " vs. ", test2[0], ", ", test1[1], " vs. ", test2[1], ", ", test1[2], " vs. ", test2[2], ", ", static_cast<std::int32_t>(value.z), " vs. ", z_value);
 		}
 
 		// z-value is down (see datasheet) (because of overflow z must be more than 18 bits)
@@ -187,12 +187,12 @@ class MMC5983MA final : public SFE_MMC5983MA {
 	using SFE_MMC5983MA::begin;
 };
 
-namespace common {
+namespace common2 {
 	void print_low_level(MMC5983MA::MagneticFluxDensityDataRaw const& d) {
-		common::print_low_level(d.x);
-		common::print_low_level(',');
-		common::print_low_level(d.y);
-		common::print_low_level(',');
-		common::print_low_level(d.z);
+		common2::print_low_level(d.x);
+		common2::print_low_level(',');
+		common2::print_low_level(d.y);
+		common2::print_low_level(',');
+		common2::print_low_level(d.z);
 	}
 }  // namespace common

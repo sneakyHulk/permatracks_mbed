@@ -10,9 +10,9 @@ HardwareSerial Serial1(PB7, PB6);
 #include <LIS3MDL.h>
 #include <MMC5983MA.h>
 #include <SPI.h>
-#include <common_message.h>
-#include <common_output.h>
-#include <common_time.h>
+#include <common2_message.h>
+#include <common2_output.h>
+#include <common2_time.h>
 
 #include <bit>
 #include <cstring>
@@ -92,7 +92,7 @@ void setup() {
 	blink_led(2000);
 
 	// obligatory Hello World
-	common::println_time(millis(), "Hello World from Magnetometer Array V1");
+	common2::println_time(millis(), "Hello World from Magnetometer Array V1");
 
 	// begin SPI
 	// clang-format off
@@ -211,7 +211,7 @@ void setup() {
 
 	digitalWrite(PC13, led_state = LOW);
 
-	std::tie(time_delay, time_offset) = common::sync_time();
+	std::tie(time_delay, time_offset) = common2::sync_time();
 
 	delay(1);
 }
@@ -223,7 +223,7 @@ void loop() {
 
 	static unsigned long last = 0;
 	unsigned long now = millis();
-	if (now - last > 20) common::message("Took ", now - last, "ms!");
+	if (now - last > 20) common2::message("Took ", now - last, "ms!");
 	while (now - last < 20) {
 		delay(1);
 		now = millis();
@@ -260,7 +260,7 @@ void loop() {
 	// timestamp computation is here because the LIS3MDLs already have the measurements, whereas for the MMC5983MA they have to be obtained.
 	// std::tie(time_delay, time_offset) = common::sync_time();
 	if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
-		common::message("micros overflow detected!");
+		common2::message("micros overflow detected!");
 		return;
 	}
 

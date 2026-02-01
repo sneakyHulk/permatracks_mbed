@@ -1,8 +1,8 @@
 #pragma once
 
 #include <SPI.h>
-#include <common.h>
-#include <common_output.h>
+#include <common2.h>
+#include <common2_output.h>
 
 #define private protected
 #include <Adafruit_LIS3MDL.h>
@@ -20,64 +20,64 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	void begin(lis3mdl_performancemode_t performance_mode = LIS3MDL_ULTRAHIGHMODE, lis3mdl_operationmode_t operation_mode = LIS3MDL_CONTINUOUSMODE, lis3mdl_dataRate_t data_rate = LIS3MDL_DATARATE_80_HZ,
 	    lis3mdl_range_t range = LIS3MDL_RANGE_4_GAUSS) {
 		if (!begin_SPI(cs_pin, spi, 10000000)) {
-			common::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
+			common2::println_time_loc(millis(), '\'', sensor_name, '\'', " failed to initialize SPI!");
 			return;
 		}
 
 		setPerformanceMode(performance_mode);
-		common::print_time(millis(), '\'', sensor_name, '\'', " performance mode set to: ");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " performance mode set to: ");
 		switch (getPerformanceMode()) {
-			case LIS3MDL_LOWPOWERMODE: common::println("Low"); break;
-			case LIS3MDL_MEDIUMMODE: common::println("Medium"); break;
-			case LIS3MDL_HIGHMODE: common::println("High"); break;
-			case LIS3MDL_ULTRAHIGHMODE: common::println("Ultra-High"); break;
+			case LIS3MDL_LOWPOWERMODE: common2::println("Low"); break;
+			case LIS3MDL_MEDIUMMODE: common2::println("Medium"); break;
+			case LIS3MDL_HIGHMODE: common2::println("High"); break;
+			case LIS3MDL_ULTRAHIGHMODE: common2::println("Ultra-High"); break;
 		}
 
 		setOperationMode(operation_mode);
-		common::print_time(millis(), '\'', sensor_name, '\'', " operation mode set to: ");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " operation mode set to: ");
 		// Single shot mode will complete conversion and go into power down
 		switch (getOperationMode()) {
-			case LIS3MDL_CONTINUOUSMODE: common::println("Continuous"); break;
-			case LIS3MDL_SINGLEMODE: common::println("Single mode"); break;
-			case LIS3MDL_POWERDOWNMODE: common::println("Power-down"); break;
+			case LIS3MDL_CONTINUOUSMODE: common2::println("Continuous"); break;
+			case LIS3MDL_SINGLEMODE: common2::println("Single mode"); break;
+			case LIS3MDL_POWERDOWNMODE: common2::println("Power-down"); break;
 		}
 
 		setDataRate(data_rate);
 		// You can check the datarate by looking at the frequency of the DRDY pin
-		common::print_time(millis(), '\'', sensor_name, '\'', " data rate set to: ");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " data rate set to: ");
 
 		switch (getDataRate()) {
-			case LIS3MDL_DATARATE_0_625_HZ: common::println("0.625 Hz"); break;
-			case LIS3MDL_DATARATE_1_25_HZ: common::println("1.25 Hz"); break;
-			case LIS3MDL_DATARATE_2_5_HZ: common::println("2.5 Hz"); break;
-			case LIS3MDL_DATARATE_5_HZ: common::println("5 Hz"); break;
-			case LIS3MDL_DATARATE_10_HZ: common::println("10 Hz"); break;
-			case LIS3MDL_DATARATE_20_HZ: common::println("20 Hz"); break;
-			case LIS3MDL_DATARATE_40_HZ: common::println("40 Hz"); break;
-			case LIS3MDL_DATARATE_80_HZ: common::println("80 Hz"); break;
-			case LIS3MDL_DATARATE_155_HZ: common::println("155 Hz"); break;
-			case LIS3MDL_DATARATE_300_HZ: common::println("300 Hz"); break;
-			case LIS3MDL_DATARATE_560_HZ: common::println("560 Hz"); break;
-			case LIS3MDL_DATARATE_1000_HZ: common::println("1000 Hz"); break;
+			case LIS3MDL_DATARATE_0_625_HZ: common2::println("0.625 Hz"); break;
+			case LIS3MDL_DATARATE_1_25_HZ: common2::println("1.25 Hz"); break;
+			case LIS3MDL_DATARATE_2_5_HZ: common2::println("2.5 Hz"); break;
+			case LIS3MDL_DATARATE_5_HZ: common2::println("5 Hz"); break;
+			case LIS3MDL_DATARATE_10_HZ: common2::println("10 Hz"); break;
+			case LIS3MDL_DATARATE_20_HZ: common2::println("20 Hz"); break;
+			case LIS3MDL_DATARATE_40_HZ: common2::println("40 Hz"); break;
+			case LIS3MDL_DATARATE_80_HZ: common2::println("80 Hz"); break;
+			case LIS3MDL_DATARATE_155_HZ: common2::println("155 Hz"); break;
+			case LIS3MDL_DATARATE_300_HZ: common2::println("300 Hz"); break;
+			case LIS3MDL_DATARATE_560_HZ: common2::println("560 Hz"); break;
+			case LIS3MDL_DATARATE_1000_HZ: common2::println("1000 Hz"); break;
 		}
 
 		setRange(range);
-		common::print_time(millis(), '\'', sensor_name, '\'', " range set to: ");
+		common2::print_time(millis(), '\'', sensor_name, '\'', " range set to: ");
 		switch (getRange()) {
-			case LIS3MDL_RANGE_4_GAUSS: common::println("+-4 gauss"); break;
-			case LIS3MDL_RANGE_8_GAUSS: common::println("+-8 gauss"); break;
-			case LIS3MDL_RANGE_12_GAUSS: common::println("+-12 gauss"); break;
-			case LIS3MDL_RANGE_16_GAUSS: common::println("+-16 gauss"); break;
+			case LIS3MDL_RANGE_4_GAUSS: common2::println("+-4 gauss"); break;
+			case LIS3MDL_RANGE_8_GAUSS: common2::println("+-8 gauss"); break;
+			case LIS3MDL_RANGE_12_GAUSS: common2::println("+-12 gauss"); break;
+			case LIS3MDL_RANGE_16_GAUSS: common2::println("+-16 gauss"); break;
 		}
 	}
 
 	void start_measurement_float() {
 		if (!getEvent(&event)) {
-			common::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
+			common2::println_warn_time(millis(), '\'', sensor_name, '\'', " failed to get data!");
 		}
 	}
 
-	[[nodiscard]] common::MagneticFluxDensityData get_measurement_float() const { return {event.magnetic.y, -event.magnetic.x, event.magnetic.z}; }
+	[[nodiscard]] MagneticFluxDensityData get_measurement_float() const { return {event.magnetic.y, -event.magnetic.x, event.magnetic.z}; }
 
 	void start_measurement() {
 		uint8_t buffer[6];
@@ -125,12 +125,12 @@ class LIS3MDL final : public Adafruit_LIS3MDL {
 	using Adafruit_LIS3MDL::begin_SPI;
 };
 
-namespace common {
+namespace common2 {
 	void print_low_level(LIS3MDL::MagneticFluxDensityDataRaw const& d) {
-		common::print_low_level(d.x);
-		common::print_low_level(',');
-		common::print_low_level(d.y);
-		common::print_low_level(',');
-		common::print_low_level(d.z);
+		common2::print_low_level(d.x);
+		common2::print_low_level(',');
+		common2::print_low_level(d.y);
+		common2::print_low_level(',');
+		common2::print_low_level(d.z);
 	}
 }  // namespace common
