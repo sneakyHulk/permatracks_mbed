@@ -184,7 +184,7 @@ void setup() {
 		// Initialize LSM6DSV16X
 		gyro.begin();
 
-		if (std::uint8_t id; gyro.ReadID(&id) == LSM6DSV16X_OK && id == 0x70u) {
+		if (std::uint8_t id; gyro.ReadID(&id) == LSM6DSV16X_OK && id == 0x70u || true) {
 			Serial.print("Initialized LSM6DSV16X, ID: ");
 			Serial.println(id);
 
@@ -214,41 +214,6 @@ void setup() {
 
 	{  // connect AK09940A
 		delay(100);
-
-		ak077.begin();
-		ak078.begin();
-		ak079.begin();
-		ak080.begin();
-		ak081.begin();
-		ak082.begin();
-		ak083.begin();
-		ak084.begin();
-		ak085.begin();
-		ak086.begin();
-		ak087.begin();
-		ak088.begin();
-		ak089.begin();
-		ak090.begin();
-		ak091.begin();
-		ak092.begin();
-		ak093.begin();
-		ak094.begin();
-		ak095.begin();
-		ak096.begin();
-		ak097.begin();
-		ak098.begin();
-		ak099.begin();
-		ak100.begin();
-		ak101.begin();
-		ak102.begin();
-		ak103.begin();
-		ak104.begin();
-		ak105.begin();
-		ak106.begin();
-		ak107.begin();
-		ak108.begin();
-		ak109.begin();
-		ak110.begin();
 
 		ak000.begin();
 		ak001.begin();
@@ -328,6 +293,41 @@ void setup() {
 		ak074.begin();
 		ak075.begin();
 		ak076.begin();
+
+		ak077.begin();
+		ak078.begin();
+		ak079.begin();
+		ak080.begin();
+		ak081.begin();
+		ak082.begin();
+		ak083.begin();
+		ak084.begin();
+		ak085.begin();
+		ak086.begin();
+		ak087.begin();
+		ak088.begin();
+		ak089.begin();
+		ak090.begin();
+		ak091.begin();
+		ak092.begin();
+		ak093.begin();
+		ak094.begin();
+		ak095.begin();
+		ak096.begin();
+		ak097.begin();
+		ak098.begin();
+		ak099.begin();
+		ak100.begin();
+		ak101.begin();
+		ak102.begin();
+		ak103.begin();
+		ak104.begin();
+		ak105.begin();
+		ak106.begin();
+		ak107.begin();
+		ak108.begin();
+		ak109.begin();
+		ak110.begin();
 	}
 
 	Serial.println("Ready.");
@@ -337,7 +337,7 @@ void setup() {
 	}
 }
 
-void print(AK09940A::MagneticFluxDensityDataRaw const data) {
+void print(MagneticFluxDensityDataRawAK09940A const data) {
 	constexpr double scale = 0.01;
 	double const x_uT = data.x * scale;  // AK09940A::get_scale_factor();
 	double const y_uT = data.y * scale;  // AK09940A::get_scale_factor();
