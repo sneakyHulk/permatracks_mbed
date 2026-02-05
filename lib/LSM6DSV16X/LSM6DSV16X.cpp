@@ -6,6 +6,29 @@ LSM6DSV16X::LSM6DSV16X(TwoWire* i2c, std::uint8_t const device_address) : stmdev
 void LSM6DSV16X::begin() {
 	platform_delay(BOOT_TIME);
 
+	common2::print("Reboot device...");
+	for (; lsm6dsv16x_reboot(this);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	platform_delay(BOOT_TIME);
+
+	// common2::print("Software reset...");
+	// for (; lsm6dsv16x_sw_reset(this);) {
+	// 	common2::print("Error! Retry...");
+	// 	delay(100);
+	// }
+	// common2::println("Done!");
+
+	// common2::print("Sensor Hub reset...");
+	// for (; lsm6dsv16x_sh_reset_set(this, PROPERTY_ENABLE);) {
+	// 	common2::print("Error! Retry...");
+	// 	delay(100);
+	// }
+	// common2::println("Done!");
+
 	common2::print("Check device ID...");
 	for (std::uint8_t id; lsm6dsv16x_device_id_get(this, &id) && id != LSM6DSV16X_ID;) {
 		common2::print("Error! ID: ", id, "/", " Retry...");
@@ -16,6 +39,13 @@ void LSM6DSV16X::begin() {
 	// Restore default configuration
 	common2::print("Restore default configuration...");
 	for (; lsm6dsv16x_sw_por(this);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Disable Sensor hub I2C master...");
+	for (; lsm6dsv16x_sh_master_set(this, PROPERTY_DISABLE);) {
 		common2::print("Error! Retry...");
 		delay(100);
 	}
@@ -49,12 +79,12 @@ void LSM6DSV16X::begin() {
 	}
 	common2::println("Done!");
 
-	common2::print("Set FIFO batch XL ODR to 12.5Hz...");
-	for (; lsm6dsv16x_fifo_xl_batch_set(this, LSM6DSV16X_XL_BATCHED_AT_60Hz);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
+	//common2::print("Set FIFO batch XL ODR to 12.5Hz...");
+	//for (; lsm6dsv16x_fifo_xl_batch_set(this, LSM6DSV16X_XL_BATCHED_AT_60Hz);) {
+	//	common2::print("Error! Retry...");
+	//	delay(100);
+	//}
+	//common2::println("Done!");
 
 	common2::print("Set FIFO batch Gyro ODR to 12.5Hz...");
 	for (; lsm6dsv16x_fifo_gy_batch_set(this, LSM6DSV16X_GY_BATCHED_AT_15Hz);) {
@@ -70,17 +100,29 @@ void LSM6DSV16X::begin() {
 	}
 	common2::println("Done!");
 
+	// common2::print("Set Accelerometer Output Data Rate...");
+	// for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
+	// 	common2::print("Error! Retry...");
+	// 	delay(100);
+	// }
+	// common2::println("Done!");
 
-
-	common2::print("Set Accelerometer Output Data Rate...");
-	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_30Hz);) {
+	common2::print("Set Gyro Output Data Rate...");
+	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
 		common2::print("Error! Retry...");
 		delay(100);
 	}
 	common2::println("Done!");
 
-	common2::print("Set Gyro Output Data Rate...");
-	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_30Hz);) {
+	common2::print("Set Timestamp Rate...");
+	for (; lsm6dsv16x_fifo_timestamp_batch_set(this, LSM6DSV16X_TMSTMP_DEC_8);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Enable Timestamp...");
+	for (; lsm6dsv16x_timestamp_set(this, PROPERTY_ENABLE);) {
 		common2::print("Error! Retry...");
 		delay(100);
 	}
@@ -97,21 +139,19 @@ void LSM6DSV16X::begin() {
 	// }
 	// common2::println("Done!");
 
-
-
-	common2::print("Set sflp Output Data Rate...");
-	for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_30Hz);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Enable Game Rotation...");
-	for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
+	// common2::print("Set sflp Output Data Rate...");
+	// for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_30Hz);) {
+	//	common2::print("Error! Retry...");
+	//	delay(100);
+	// }
+	// common2::println("Done!");
+	//
+	// common2::print("Enable Game Rotation...");
+	// for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
+	//	common2::print("Error! Retry...");
+	//	delay(100);
+	//}
+	// common2::println("Done!");
 }
 std::int32_t LSM6DSV16X::platform_write(void* handle, std::uint8_t const reg, std::uint8_t const* bufp, std::uint16_t const len) {
 	auto* obj = static_cast<LSM6DSV16X*>(handle);
@@ -149,8 +189,10 @@ void LSM6DSV16X::start_measurement() {
 		num = fifo_status.fifo_level;
 		common2::println("FIFO num: ", static_cast<std::uint16_t>(fifo_status.fifo_level));
 		common2::println("FIFO full: ", static_cast<std::uint8_t>(fifo_status.fifo_full));
+		common2::println(messages);
 	}
 }
+
 bool LSM6DSV16X::get_measurement() {
 	for (; num; --num) {
 		lsm6dsv16x_fifo_out_raw_t f_data;
@@ -166,17 +208,19 @@ bool LSM6DSV16X::get_measurement() {
 		}
 		// common2::println("Done!");
 
-		switch (f_data.tag) {
-			// case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG tag"); return true;
-			// case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG tag: "); return true;
-			case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG:
-				common2::println("num: ", num, ", LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG tag: ");
-				return true;
-				// default: common2::print("num: ", num, ", Unknown tag: ", static_cast<std::uint8_t>(f_data.tag));
-		}
+		++messages[f_data.tag];
 
-		lsm6dsv16x_fifo
+		switch (f_data.tag) {
+			case LSM6DSV16X_XL_NC_TAG: common2::println("num: ", num, ", LSM6DSV16X_XL_NC_TAG tag"); return true;
+			case LSM6DSV16X_GY_NC_TAG: common2::println("num: ", num, ", LSM6DSV16X_GY_NC_TAG tag"); return true;
+			case LSM6DSV16X_TIMESTAMP_TAG: common2::println("num: ", num, ", LSM6DSV16X_TIMESTAMP_TAG tag"); return true;
+		}
 	}
+
+	// case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG tag"); return true;
+	// case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG tag: "); return true;
+	// case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG tag: "); return true;
+	// default: common2::print("num: ", num, ", Unknown tag: ", static_cast<std::uint8_t>(f_data.tag));
 
 	return false;
 }

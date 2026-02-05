@@ -352,7 +352,7 @@ void loop() {
 	if (++tmp % 2) {
 		delay(10);
 	} else {
-		delay(1);
+		delay(20);
 	}
 
 	return;

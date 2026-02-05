@@ -10,6 +10,7 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	constexpr static auto BOOT_TIME = 10;  // ms
 	std::uint16_t num = 0;
 	lsm6dsv16x_fifo_status_t fifo_status;
+	std::array<std::uint64_t, 0x1E> messages = {};
 
    public:
 	TwoWire *i2c;
