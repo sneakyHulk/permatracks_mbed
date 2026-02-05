@@ -4,3 +4,6 @@
 [submodule "lib/data_collection"]
 	path = lib/data_collection
 	url = https://github.com/sneakyHulk/permatracks_data_collection.git
+[submodule "lib/lsm6dsv16x-pid"]
+	path = lib/lsm6dsv16x-pid
+	url = https://github.com/STMicroelectronics/lsm6dsv16x-pid.git

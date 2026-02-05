@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <CRC16.h>
-#include <LSM6DSV16XSensor.h>
 #include <Wire.h>
+#include <common2.h>
+#include <common2_time.h>
 
 #include <bit>
 #include <chrono>
@@ -12,13 +13,13 @@
 
 #include "AK09940A.h"
 #include "CRC16.h"
-#include "common2_message.h"
-#include "common2_time.h"
+#include "LSM6DSV16X.h"
 
 bool led_state = LOW;
 
 auto i2c2 = TwoWire(PB_11, PB_10);
-auto gyro = LSM6DSV16XSensor(&i2c2);
+// auto gyro = LSM6DSV16XSensor(&i2c2, 0b110'1010);
+auto gyro = LSM6DSV16X(&i2c2, 0b110'1010);
 
 auto spi1 = SPIClass(PA_7, PA_6, PA_5);
 auto spi2 = SPIClass(PB_15, PB_14, PB_13);
@@ -166,51 +167,40 @@ void setup() {
 	delay(100);
 
 	{  // config spis
-		spi1.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
-		spi2.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
-		spi3.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+	   // spi1.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+	   // spi2.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+	   // spi3.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
 	}
 
 	delay(100);
 
 	{  // config I2C2
 		i2c2.begin();
-		i2c2.setClock(200'000);
+		i2c2.setClock(400'000);
 	}
 
 	delay(100);
 
-	{  // config gyro
-		// Initialize LSM6DSV16X
+	{
 		gyro.begin();
 
-		if (std::uint8_t id; gyro.ReadID(&id) == LSM6DSV16X_OK && id == 0x70u || true) {
-			Serial.print("Initialized LSM6DSV16X, ID: ");
-			Serial.println(id);
-
-			gyro.Enable_X();
-			gyro.Enable_G();
-
-			// Enable Sensor Fusion
-			int status = LSM6DSV16X_OK;
-			status |= gyro.Set_X_FS(4);
-			status |= gyro.Set_G_FS(2000);
-			status |= gyro.Set_X_ODR(120.0f);
-			status |= gyro.Set_G_ODR(120.0f);
-			status |= gyro.Set_SFLP_ODR(120.0f);
-			status |= gyro.Enable_Rotation_Vector();
-			status |= gyro.FIFO_Set_Mode(LSM6DSV16X_STREAM_MODE);
-
-			if (status != LSM6DSV16X_OK) {
-				Serial.println("LSM6DSV16X Sensor failed to init/configure");
-			}
-		} else {
-			Serial.print("Initialization of LSM6DSV16X failed, ID: ");
-			Serial.println(id);
-		}
+		// common2::print("Initialize Gyro Bias...");
+		// static lsm6dsv16x_sflp_gbias_t gbias;
+		// gbias.gbias_x = 0.0f;
+		// gbias.gbias_y = 0.0f;
+		// gbias.gbias_z = 0.0f;
+		// for (; lsm6dsv16x_sflp_game_gbias_set(&gyro, &gbias);) {
+		// 	common2::print("Error! Retry...");
+		// 	delay(100);
+		// }
+		// common2::println("Done!");
 	}
 
 	delay(100);
+
+	Serial.println("Ready.");
+
+	return;
 
 	{  // connect AK09940A
 		delay(100);
@@ -330,8 +320,6 @@ void setup() {
 		ak110.begin();
 	}
 
-	Serial.println("Ready.");
-
 	{  // sync time
 		std::tie(time_delay, time_offset) = common2::sync_time();
 	}
@@ -353,6 +341,46 @@ void print(MagneticFluxDensityDataRawAK09940A const data) {
 
 void loop() {
 	static CRC16 crc(0x8005, 0, false, true, true);
+	static std::uint64_t tmp = 0;
+	{
+		gyro.start_measurement();
+
+		for (; gyro.get_measurement();) {
+		}
+	}
+
+	if (++tmp % 2) {
+		delay(10);
+	} else {
+		delay(1);
+	}
+
+	return;
+
+	/*{
+	    if (lsm6dsv16x_fifo_status_t fifo_status; fifo_status.fifo_th == 1) {
+	        if (std::uint16_t samples = fifo_status.fifo_level; samples > 0) {
+	            common2::println("LSM6DSV16x fifo level: ", samples);
+
+	            if (auto res = gyro.getFIFOData(); res.index() == 0) {
+	                auto const gbias = std::get<LSM6DSV16X::GBiasVector>(res);
+	                common2::println("GBIAS [mdps]: X:", gbias.x, ", Y:", gbias.y, ", Z:", gbias.z);
+	            } else if (res.index() == 1) {
+	                auto const gravity = std::get<LSM6DSV16X::GravityVector>(res);
+	                common2::println("Gravity [mg]: X:", gravity.x, ", Y:", gravity.y, ", Z:", gravity.z);
+	            } else if (res.index() == 2) {
+	                auto const game_rotation = std::get<LSM6DSV16X::RotationQuaternion>(res);
+	                common2::println("Game Rotation: X:", game_rotation.x, ", Y:", game_rotation.y, ", Z:", game_rotation.z, ", W:", game_rotation.w);
+	            }
+	        } else {
+	            common2::println("LSM6DSV16x fifo level: ", samples);
+	        }
+	    } else {
+	        common2::println("LSM6DSV16x fifo level: ", static_cast<int>(fifo_status.fifo_th));
+	    }
+
+	    delay(100);
+	}*/
 
 	{  // trigger sensors
 		digitalWrite(PI_7, HIGH);
@@ -372,38 +400,6 @@ void loop() {
 	{  // blink LED
 		digitalWrite(PD_10, led_state = !led_state);
 	}
-
-	/*{  // poll gyro
-	    if (std::uint16_t samples = 0; gyro.FIFO_Get_Num_Samples(&samples) == LSM6DSV16X_OK) {
-	        for (int i = 0; i < samples; i++) {
-	            std::uint8_t tag = 0;
-	            gyro.FIFO_Get_Tag(&tag);
-
-	            if (tag == 0x13u) {
-	                float quaternions[4] = {0};
-	                gyro.FIFO_Get_Rotation_Vector(&quaternions[0]);
-
-	                // Print Quaternion data
-	                Serial.print("Quaternion: ");
-	                Serial.print(quaternions[3], 4);
-	                Serial.print(", ");
-	                Serial.print(quaternions[0], 4);
-	                Serial.print(", ");
-	                Serial.print(quaternions[1], 4);
-	                Serial.print(", ");
-	                Serial.println(quaternions[2], 4);
-	            } else {
-	                // Serial.print("Unknown tag: ");
-	                // Serial.println(tag);
-
-	                break;
-	            }
-	        }
-	    } else {
-	        Serial.println("LSM6DSV16X Sensor failed to get number of samples inside FIFO");
-	        while (true);
-	    }
-	}*/
 
 	{  // poll AK09940A
 		/*ak000.start_measurement();

@@ -11,7 +11,7 @@
 [[maybe_unused]] constexpr std::uint8_t operator""_u8(unsigned long long int num) { return static_cast<std::uint8_t>(num); }
 
 namespace common2 {
-	void print_low_level(MagneticFluxDensityData const& d) {
+	inline void print_low_level(MagneticFluxDensityData const& d) {
 		common2::print_low_level(d.x);
 		common2::print_low_level(',');
 		common2::print_low_level(d.y);

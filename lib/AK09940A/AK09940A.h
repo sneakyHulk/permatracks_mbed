@@ -133,7 +133,7 @@ class AK09940A final {
 		//	if (std::uint8_t const status = spi->transfer(0x00); status & 0b0000'0001) break;
 		//} while (true);
 
-		for (auto i = 0; i < 200; ++i) {
+		for (auto i = 0; i < retries; ++i) {
 			spi->transfer(0x00 | 0x80);
 			std::uint8_t const wia1 = spi->transfer(0x00);
 			std::uint8_t const wia2 = spi->transfer(0x00);
