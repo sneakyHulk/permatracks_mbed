@@ -7,7 +7,7 @@
 
 #include <expected>
 
-class DataPrinterV1 : public virtual SerialConnection, public MiMedMagnetometerArraySerialConnectionBinary<SENSOR_TYPE<MagneticFluxDensityDataRawLIS3MDL, 25, 16>, SENSOR_TYPE<MagneticFluxDensityDataRawMMC5983MA, 0, 25>> {
+class DataPrinterV1 : public virtual SerialConnection, public MagArrayParser<SENSOR_TYPE<MagneticFluxDensityDataRawLIS3MDL, 25, 16>, SENSOR_TYPE<MagneticFluxDensityDataRawMMC5983MA, 0, 25>> {
 	void handle_parse_result(Message<Array<MagneticFluxDensityData, total_mag_sensors>>& magnetic_flux_density_message) override { std::cout << magnetic_flux_density_message << std::endl; }
 
    public:
@@ -22,7 +22,7 @@ class DataPrinterV1 : public virtual SerialConnection, public MiMedMagnetometerA
 	}
 };
 
-class DataPrinterV2 : public virtual SerialConnection, public MiMedMagnetometerArraySerialConnectionBinary<SENSOR_TYPE<MagneticFluxDensityDataRawAK09940A, 0, 111>> {
+class DataPrinterV2 : public virtual SerialConnection, public MagArrayParser<SENSOR_TYPE<MagneticFluxDensityDataRawAK09940A, 0, 111>> {
 	void handle_parse_result(Message<Array<MagneticFluxDensityData, total_mag_sensors>>& magnetic_flux_density_message) override { std::cout << magnetic_flux_density_message << std::endl; }
 
    public:
