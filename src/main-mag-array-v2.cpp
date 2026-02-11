@@ -1,9 +1,26 @@
 #include <AK09940A.h>
+#include <AccelerationDataRaw.h>
 #include <Arduino.h>
 #include <CRC16.h>
 #include <CRC8.h>
-#include <LSM6DSV16X.h>
+#include <GyroDataRaw.h>
 #include <Wire.h>
+inline void print_low_level(AccelerationDataRaw const& d) {
+	common2::print_low_level(d.ax);
+	common2::print_low_level(',');
+	common2::print_low_level(d.ay);
+	common2::print_low_level(',');
+	common2::print_low_level(d.az);
+}
+
+inline void print_low_level(GyroDataRaw const& d) {
+	common2::print_low_level(d.gx);
+	common2::print_low_level(',');
+	common2::print_low_level(d.gy);
+	common2::print_low_level(',');
+	common2::print_low_level(d.gz);
+}
+#include <LSM6DSV16X.h>
 #include <common2.h>
 #include <common2_time.h>
 
@@ -173,19 +190,18 @@ void setup() {
 
 	delay(100);
 
-	{  // config I2C2
+	{  // config I2C2 and imu
 		i2c2.begin();
 		// i2c2.setClock(10'000);
+
+		delay(100);
+
+		imu.begin_fifo();
 	}
 
 	delay(100);
 
-	{
-		// imu.begin_self_test();
-		imu.begin();
-	}
-
-	delay(100);
+	return;
 
 	{  // connect AK09940A
 		delay(100);
@@ -327,13 +343,16 @@ void print(MagneticFluxDensityDataRawAK09940A const data) {
 void poll_imu() {
 	static CRC8 crc8;
 
-	imu.start_measurement();
-
-	// gyro.start_measurement();
-	// for (; gyro.get_measurement();) {
-	// }
-
+#if not NDEBUG
 	if (auto accel_data = imu.get_measurement_accelerometer(); accel_data) {
+		common2::println("Accelerometer: ", accel_data.value());
+	}
+	if (auto gyro_data = imu.get_measurement_gyro(); gyro_data) {
+		common2::println("Gyro: ", gyro_data.value());
+	}
+#endif
+
+	if (auto const accel_data = imu.get_measurement_accelerometer(); accel_data) {
 		Serial.write(static_cast<std::uint8_t>('A'));
 
 		auto const scale_imu_accel = std::bit_cast<std::array<std::uint8_t, sizeof(float)>>(imu.get_scale_factor_accelerometer());
@@ -353,7 +372,7 @@ void poll_imu() {
 
 		crc8.restart();
 	}
-	if (auto gyro_data = imu.get_measurement_gyro(); gyro_data) {
+	if (auto const gyro_data = imu.get_measurement_gyro(); gyro_data) {
 		Serial.write(static_cast<std::uint8_t>('G'));
 
 		auto const scale_imu_gyro = std::bit_cast<std::array<std::uint8_t, sizeof(float)>>(imu.get_scale_factor_gyro());
@@ -375,9 +394,34 @@ void poll_imu() {
 	}
 }
 
+void poll_imu_fifo() {
+	static CRC8 crc8;
+	for (std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_fifo());) {
+		if (std::holds_alternative<AccelerationDataRaw>(val)) {
+			common2::println("Accelerometer: ", std::get<AccelerationDataRaw>(val));
+		}
+		if (std::holds_alternative<GyroDataRaw>(val)) {
+			common2::println("Gyro: ", std::get<GyroDataRaw>(val));
+		}
+		if (std::holds_alternative<std::uint64_t>(val)) {
+			common2::println("Timestamp: ", std::get<std::uint64_t>(val));
+		}
+	}
+}
+
 void loop() {
 	static CRC16 crc16(0x8005, 0, false, true, true);
 	decltype(micros()) t1;
+
+	imu.start_measurement_fifo();
+
+	poll_imu_fifo();
+
+	common2::println("POLL:");
+
+	delay(100);
+
+	return;
 
 	{  // trigger sensors
 		digitalWrite(PI_7, HIGH);
@@ -386,8 +430,6 @@ void loop() {
 		t1 = micros();
 		// delayMicroseconds(3100);
 	}
-
-	poll_imu();
 
 	{  // check overflow
 		// std::tie(time_delay, time_offset) = common::sync_time();

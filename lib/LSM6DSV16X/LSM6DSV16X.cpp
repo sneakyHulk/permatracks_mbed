@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <common2.h>
 
+#include <bit>
 #include <cstring>
 
 #define MIN_ST_LIMIT_mg 50.0f
@@ -26,30 +27,43 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	 * Accelerometer Self Test
 	 */
 	/* Set Output Data Rate */
+	common2::println("Set Output Data Rate");
 	lsm6dsv16x_xl_data_rate_set(dev_ctx, LSM6DSV16X_ODR_AT_60Hz);
+	dev_ctx->mdelay(100);
 	/* Set full scale */
+	common2::println("Set full scale");
 	lsm6dsv16x_xl_full_scale_set(dev_ctx, LSM6DSV16X_4g);
 	/* Wait stable output */
 	dev_ctx->mdelay(100);
 
 	/* Check if new value available */
 	do {
+		common2::println("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_xl);
 
+	dev_ctx->mdelay(100);
+
 	/* Read dummy data and discard it */
+	common2::println("Read dummy data and discard it");
 	lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
+	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
 	memset(val_st_off, 0x00, 3 * sizeof(float));
 
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
+			common2::println("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_xl);
 
 		/* Read data and accumulate the mg value */
+		common2::println("Read data and accumulate the mg value");
 		lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
+		dev_ctx->mdelay(100);
 
 		for (j = 0; j < 3; j++) {
 			val_st_off[j] += lsm6dsv16x_from_fs4_to_mg(data_raw[j]);
@@ -62,6 +76,7 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	}
 
 	/* Enable Self Test positive (or negative) */
+	common2::println("Enable Self Test positive (or negative)");
 	lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_NEGATIVE);
 	// lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_POSITIVE);
 	/* Wait stable output */
@@ -69,22 +84,30 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 
 	/* Check if new value available */
 	do {
+		common2::println("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_xl);
 
 	/* Read dummy data and discard it */
+	common2::println("Read dummy data and discard it");
 	lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
+	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
 	memset(val_st_on, 0x00, 3 * sizeof(float));
 
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
+			common2::println("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_xl);
 
 		/* Read data and accumulate the mg value */
+		common2::println("Read data and accumulate the mg value");
 		lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
+		dev_ctx->mdelay(100);
 
 		for (j = 0; j < 3; j++) {
 			val_st_on[j] += lsm6dsv16x_from_fs4_to_mg(data_raw[j]);
@@ -111,39 +134,56 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 		}
 	}
 
-	if (st_result == ST_FAIL) return st_result;
-
 	/* Disable Self Test */
+	common2::println("Disable Self Test");
 	lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_DISABLE);
+	dev_ctx->mdelay(100);
 	/* Disable sensor. */
+	common2::println("Disable sensor");
 	lsm6dsv16x_xl_data_rate_set(dev_ctx, LSM6DSV16X_ODR_OFF);
+	dev_ctx->mdelay(100);
+
+	if (st_result == ST_PASS) common2::println("Accelerometer OK!");
+
 	/*
 	 * Gyroscope Self Test
 	 */
 	/* Set Output Data Rate */
+	common2::println("Set Output Data Rate");
 	lsm6dsv16x_gy_data_rate_set(dev_ctx, LSM6DSV16X_ODR_AT_240Hz);
+	dev_ctx->mdelay(100);
 	/* Set full scale */
+	common2::println("Set full scale");
 	lsm6dsv16x_gy_full_scale_set(dev_ctx, LSM6DSV16X_2000dps);
 	/* Wait stable output */
 	dev_ctx->mdelay(100);
 
 	/* Check if new value available */
 	do {
+		common2::println("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_gy);
 
 	/* Read dummy data and discard it */
+	common2::println("Read dummy data and discard it");
 	lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
+	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
 	memset(val_st_off, 0x00, 3 * sizeof(float));
 
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
+			common2::println("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_gy);
+
 		/* Read data and accumulate the mg value */
+		common2::println("Read data and accumulate the mg value");
 		lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
+		dev_ctx->mdelay(100);
 
 		for (j = 0; j < 3; j++) {
 			val_st_off[j] += lsm6dsv16x_from_fs2000_to_mdps(data_raw[j]);
@@ -156,6 +196,7 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	}
 
 	/* Enable Self Test positive (or negative) */
+	common2::println("Enable Self Test positive (or negative)");
 	lsm6dsv16x_gy_self_test_set(dev_ctx, LSM6DSV16X_GY_ST_POSITIVE);
 	// lsm6dsv16x_gy_self_test_set(dev_ctx, LIS2DH12_GY_ST_NEGATIVE);
 	/* Wait stable output */
@@ -166,11 +207,15 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
+			common2::println("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
+			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_gy);
 
 		/* Read data and accumulate the mg value */
+		common2::println("Read data and accumulate the mg value");
 		lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
+		dev_ctx->mdelay(100);
 
 		for (j = 0; j < 3; j++) {
 			val_st_on[j] += lsm6dsv16x_from_fs2000_to_mdps(data_raw[j]);
@@ -196,68 +241,20 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	}
 
 	/* Disable Self Test */
+	common2::println("Disable Self Test");
 	lsm6dsv16x_gy_self_test_set(dev_ctx, LSM6DSV16X_GY_ST_DISABLE);
+	dev_ctx->mdelay(100);
 	/* Disable sensor. */
+	common2::println("Disable sensor");
 	lsm6dsv16x_gy_data_rate_set(dev_ctx, LSM6DSV16X_ODR_OFF);
+	dev_ctx->mdelay(100);
+
+	if (st_result == ST_PASS) common2::println("Gyro OK!");
 
 	return st_result;
 }
 
-LSM6DSV16X::LSM6DSV16X(TwoWire* i2c, std::uint8_t const device_address) : stmdev_ctx_t{.write_reg = platform_write, .read_reg = platform_read, .mdelay = platform_delay, .handle = this}, i2c(i2c), device_address(device_address) {}
-void LSM6DSV16X::begin_self_test(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
-	accel_scale = accel_scale_value;
-	gyro_scale = gyro_scale_value;
-
-	platform_delay(100 * BOOT_TIME);
-
-	common2::print("Reboot device...");
-	for (; lsm6dsv16x_reboot(this);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	platform_delay(100 * BOOT_TIME);
-
-	common2::print("Check reboot and check reset...");
-	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Software reset...");
-	lsm6dsv16x_sw_reset(this);
-
-	common2::print("Check reboot and check reset...");
-	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	// Check device ID
-	common2::print("Check device ID...");
-	for (std::uint8_t id; lsm6dsv16x_device_id_get(this, &id) && id != LSM6DSV16X_ID;) {
-		common2::print("Error! ID: ", id, "/", " Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	// Restore default configuration
-	common2::print("Restore default configuration...");
-	for (; lsm6dsv16x_sw_por(this);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	self_test(this);
-}
-void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
-	accel_scale = accel_scale_value;
-	gyro_scale = gyro_scale_value;
-
+void LSM6DSV16X::init() const {
 	platform_delay(100 * BOOT_TIME);
 
 	common2::print("Reboot device...");
@@ -290,10 +287,32 @@ void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6d
 	}
 	common2::println("Done!");
 
+	common2::print("Enable Auto Increment...");
+	for (std::uint8_t val; lsm6dsv16x_auto_increment_get(this, &val) || val != PROPERTY_ENABLE;) {
+		common2::print(val, "/", PROPERTY_ENABLE, "...");
+		for (; lsm6dsv16x_auto_increment_set(this, PROPERTY_ENABLE);) {
+			common2::print("...Error! Retry");
+			delay(100);
+		}
+		delay(100);
+	}
+	common2::println("Done!");
+
 	// Restore default configuration
 	common2::print("Restore default configuration...");
 	for (; lsm6dsv16x_sw_por(this);) {
 		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Enable Block Data Update...");
+	for (std::uint8_t val; lsm6dsv16x_block_data_update_get(this, &val) || val != PROPERTY_ENABLE;) {
+		common2::print(val, "/", PROPERTY_ENABLE, "...");
+		for (; lsm6dsv16x_block_data_update_set(this, PROPERTY_ENABLE);) {
+			common2::print("...Error! Retry");
+			delay(100);
+		}
 		delay(100);
 	}
 	common2::println("Done!");
@@ -305,29 +324,23 @@ void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6d
 	// 	delay(100);
 	// }
 	// common2::println("Done!");
+}
 
-	// Enable Block Data Update
-	common2::print("Enable Block Data Update...");
-	for (; lsm6dsv16x_block_data_update_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
+LSM6DSV16X::LSM6DSV16X(TwoWire* i2c, std::uint8_t const device_address) : stmdev_ctx_t{.write_reg = platform_write, .read_reg = platform_read, .mdelay = platform_delay, .handle = this}, i2c(i2c), device_address(device_address) {}
+void LSM6DSV16X::begin_self_test(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
+	accel_scale = accel_scale_value;
+	gyro_scale = gyro_scale_value;
 
-	// Set Output Data Rate.
-	// Selected data rate have to be equal or greater with respect with MLC data rate.
-	common2::print("Set Accelerometer Output Data Rate...");
-	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_7Hz5);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-	common2::print("Set Gyro Output Data Rate...");
-	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
+	init();
+
+	self_test(this);
+}
+
+void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
+	accel_scale = accel_scale_value;
+	gyro_scale = gyro_scale_value;
+
+	init();
 
 	// Set full scale
 	common2::print("Set Accelerometer full scale...");
@@ -342,6 +355,26 @@ void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6d
 		delay(100);
 	}
 	common2::println("Done!");
+
+	// Set Output Data Rate.
+	// Selected data rate have to be equal or greater with respect with MLC data rate.
+	common2::print("Set Accelerometer Output Data Rate...");
+	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_7Hz5);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	delay(100);
+
+	common2::print("Set Gyro Output Data Rate...");
+	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	delay(100);
 
 	// Configure filtering chain
 	common2::print("Set Settling Mask...");
@@ -382,68 +415,17 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 	accel_scale = accel_scale_value;
 	gyro_scale = gyro_scale_value;
 
-	platform_delay(100 * BOOT_TIME);
-
-	common2::print("Reboot device...");
-	lsm6dsv16x_reboot(this);
-
-	platform_delay(100 * BOOT_TIME);
-
-	common2::print("Check reboot and check reset...");
-	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Software reset...");
-	lsm6dsv16x_sw_reset(this);
-
-	common2::print("Check reboot and check reset...");
-	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Check device ID...");
-	for (std::uint8_t id; lsm6dsv16x_device_id_get(this, &id) && id != LSM6DSV16X_ID;) {
-		common2::print("Error! ID: ", id, "/", " Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	// Restore default configuration
-	common2::print("Restore default configuration...");
-	for (; lsm6dsv16x_sw_por(this);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Disable Sensor hub I2C master...");
-	for (; lsm6dsv16x_sh_master_set(this, PROPERTY_DISABLE);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
-
-	common2::print("Enable Block Data Update...");
-	for (; lsm6dsv16x_block_data_update_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
-		delay(100);
-	}
-	common2::println("Done!");
+	init();
 
 	common2::print("Set Accelerometer full scale...");
-	for (; lsm6dsv16x_xl_full_scale_set(this, LSM6DSV16X_2g);) {
+	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale_value);) {
 		common2::print("Error! Retry...");
 		delay(100);
 	}
 	common2::println("Done!");
 
 	common2::print("Set Gyro full scale...");
-	for (; lsm6dsv16x_gy_full_scale_set(this, LSM6DSV16X_2000dps);) {
+	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale_value);) {
 		common2::print("Error! Retry...");
 		delay(100);
 	}
@@ -456,12 +438,12 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 	}
 	common2::println("Done!");
 
-	// common2::print("Set FIFO batch XL ODR to 12.5Hz...");
-	// for (; lsm6dsv16x_fifo_xl_batch_set(this, LSM6DSV16X_XL_BATCHED_AT_60Hz);) {
-	//	common2::print("Error! Retry...");
-	//	delay(100);
-	// }
-	// common2::println("Done!");
+	common2::print("Set FIFO batch Accelerometer ODR to 60Hz...");
+	for (; lsm6dsv16x_fifo_xl_batch_set(this, LSM6DSV16X_XL_BATCHED_AT_60Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
 
 	common2::print("Set FIFO batch Gyro ODR to 12.5Hz...");
 	for (; lsm6dsv16x_fifo_gy_batch_set(this, LSM6DSV16X_GY_BATCHED_AT_15Hz);) {
@@ -477,12 +459,12 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 	}
 	common2::println("Done!");
 
-	// common2::print("Set Accelerometer Output Data Rate...");
-	// for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
-	// 	common2::print("Error! Retry...");
-	// 	delay(100);
-	// }
-	// common2::println("Done!");
+	common2::print("Set Accelerometer Output Data Rate...");
+	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
 
 	common2::print("Set Gyro Output Data Rate...");
 	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
@@ -530,6 +512,75 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 	//}
 	// common2::println("Done!");
 }
+void LSM6DSV16X::begin_minimal() const {
+	init();
+
+	common2::print("Enable Accel High-Performance Mode...");
+	for (lsm6dsv16x_xl_mode_t val; lsm6dsv16x_xl_mode_get(this, &val) || val != LSM6DSV16X_XL_HIGH_PERFORMANCE_MD;) {
+		switch (val) {
+			case LSM6DSV16X_XL_HIGH_PERFORMANCE_MD: common2::print("LSM6DSV16X_XL_HIGH_PERFORMANCE_MD"); break;
+			case LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD: common2::print("LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD"); break;
+			case LSM6DSV16X_XL_ODR_TRIGGERED_MD: common2::print("LSM6DSV16X_XL_ODR_TRIGGERED_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_2_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_2_AVG_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_4_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_4_AVG_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_8_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_8_AVG_MD"); break;
+			case LSM6DSV16X_XL_NORMAL_MD: common2::print("LSM6DSV16X_XL_NORMAL_MD"); break;
+		}
+		common2::print("/", "LSM6DSV16X_XL_HIGH_PERFORMANCE_MD", "...");
+		for (; lsm6dsv16x_xl_mode_set(this, LSM6DSV16X_XL_HIGH_PERFORMANCE_MD);) {
+			common2::print("...Error! Retry");
+			delay(100);
+		}
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Select Accel ODR to 60Hz...");
+	for (lsm6dsv16x_data_rate_t odr_xl; lsm6dsv16x_xl_data_rate_get(this, &odr_xl) || odr_xl != LSM6DSV16X_ODR_AT_60Hz;) {
+		switch (odr_xl) {
+			case LSM6DSV16X_ODR_OFF: common2::print("LSM6DSV16X_ODR_OFF"); break;
+			case LSM6DSV16X_ODR_AT_1Hz875: common2::print("LSM6DSV16X_ODR_AT_1Hz875"); break;
+			case LSM6DSV16X_ODR_AT_7Hz5: common2::print("LSM6DSV16X_ODR_AT_7Hz5"); break;
+			case LSM6DSV16X_ODR_AT_15Hz: common2::print("LSM6DSV16X_ODR_AT_15Hz"); break;
+			case LSM6DSV16X_ODR_AT_30Hz: common2::print("LSM6DSV16X_ODR_AT_30Hz"); break;
+			case LSM6DSV16X_ODR_AT_60Hz: common2::print("LSM6DSV16X_ODR_AT_60Hz"); break;
+			case LSM6DSV16X_ODR_AT_120Hz: common2::print("LSM6DSV16X_ODR_AT_120Hz"); break;
+			case LSM6DSV16X_ODR_AT_240Hz: common2::print("LSM6DSV16X_ODR_AT_240Hz"); break;
+			case LSM6DSV16X_ODR_AT_480Hz: common2::print("LSM6DSV16X_ODR_AT_480Hz"); break;
+			case LSM6DSV16X_ODR_AT_960Hz: common2::print("LSM6DSV16X_ODR_AT_960Hz"); break;
+			case LSM6DSV16X_ODR_AT_1920Hz: common2::print("LSM6DSV16X_ODR_AT_1920Hz"); break;
+			case LSM6DSV16X_ODR_AT_3840Hz: common2::print("LSM6DSV16X_ODR_AT_3840Hz"); break;
+			case LSM6DSV16X_ODR_AT_7680Hz: common2::print("LSM6DSV16X_ODR_AT_7680Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_15Hz625: common2::print("LSM6DSV16X_ODR_HA01_AT_15Hz625"); break;
+			case LSM6DSV16X_ODR_HA01_AT_31Hz25: common2::print("LSM6DSV16X_ODR_HA01_AT_31Hz25"); break;
+			case LSM6DSV16X_ODR_HA01_AT_62Hz5: common2::print("LSM6DSV16X_ODR_HA01_AT_62Hz5"); break;
+			case LSM6DSV16X_ODR_HA01_AT_125Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_125Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_250Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_250Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_500Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_500Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_1000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_1000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_2000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_2000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_4000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_4000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_8000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_8000Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_12Hz5: common2::print("LSM6DSV16X_ODR_HA02_AT_12Hz5"); break;
+			case LSM6DSV16X_ODR_HA02_AT_25Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_25Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_50Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_50Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_100Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_100Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_200Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_200Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_400Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_400Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_800Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_800Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_1600Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_1600Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_3200Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_3200Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_6400Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_6400Hz"); break;
+		}
+		common2::print("/", "LSM6DSV16X_ODR_AT_60Hz", "...");
+		for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
+			common2::print("...Error! Retry");
+			delay(100);
+		}
+		delay(100);
+	}
+	common2::println("Done!");
+}
 std::int32_t LSM6DSV16X::platform_write(void* handle, std::uint8_t const reg, std::uint8_t const* bufp, std::uint16_t const len) {
 	auto* obj = static_cast<LSM6DSV16X*>(handle);
 
@@ -545,7 +596,7 @@ std::int32_t LSM6DSV16X::platform_read(void* handle, std::uint8_t const reg, std
 
 	obj->i2c->beginTransmission(obj->device_address);
 	if (auto const ret = obj->i2c->write(reg); ret == 0) return 1;
-	if (auto const ret = obj->i2c->endTransmission(false); !ret) return ret;
+	if (auto const ret = obj->i2c->endTransmission(true); ret != 0) return ret;  // STM32 chip produces some Errors with repeated START -> so send STOP signal to be safe.
 
 	if (auto const ret = obj->i2c->requestFrom(obj->device_address, static_cast<std::uint8_t>(len)); ret < len) return 1;
 	if (auto const ret = obj->i2c->readBytes(bufp, len); ret < len) return 1;
@@ -572,16 +623,11 @@ void LSM6DSV16X::start_measurement_fifo() {
 	// num = 0;
 	if (fifo_status.fifo_th) {
 		num = fifo_status.fifo_level;
-		// common2::println("FIFO num: ", static_cast<std::uint16_t>(fifo_status.fifo_level));
-		// common2::println("FIFO full: ", static_cast<std::uint8_t>(fifo_status.fifo_full));
-		// common2::println(messages);
 	}
 }
 
 std::optional<AccelerationDataRaw> LSM6DSV16X::get_measurement_accelerometer() const {
 	if (drdy.drdy_xl) {
-		// common2::println("Accelerometer!");
-
 		AccelerationDataRaw accel_data_raw{};
 
 		for (; lsm6dsv16x_acceleration_raw_get(this, accel_data_raw.arr);) {
@@ -597,8 +643,6 @@ std::optional<AccelerationDataRaw> LSM6DSV16X::get_measurement_accelerometer() c
 
 std::optional<GyroDataRaw> LSM6DSV16X::get_measurement_gyro() const {
 	if (drdy.drdy_gy) {
-		// common2::print("Gyro!");
-
 		GyroDataRaw gyro_data_raw{};
 
 		for (; lsm6dsv16x_angular_rate_raw_get(this, gyro_data_raw.arr);) {
@@ -612,34 +656,49 @@ std::optional<GyroDataRaw> LSM6DSV16X::get_measurement_gyro() const {
 	return {};
 }
 
-bool LSM6DSV16X::get_measurement_fifo() {
+std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> LSM6DSV16X::get_measurement_fifo() {
 	for (; num; --num) {
 		lsm6dsv16x_fifo_out_raw_t f_data;
-		std::uint8_t* axis;
-		float quat[4];
-		float gravity_mg[3];
-		float gbias_mdps[3];
 
-		// common2::print("Read FIFO sensor value...");
 		for (; lsm6dsv16x_fifo_out_raw_get(this, &f_data);) {
 			common2::print("Error! Retry...");
 			delay(100);
 		}
-		// common2::println("Done!");
 
 		++messages[f_data.tag];
 
 		switch (f_data.tag) {
-			case LSM6DSV16X_XL_NC_TAG: common2::println("num: ", num, ", LSM6DSV16X_XL_NC_TAG tag"); return true;
-			case LSM6DSV16X_GY_NC_TAG: common2::println("num: ", num, ", LSM6DSV16X_GY_NC_TAG tag"); return true;
-			case LSM6DSV16X_TIMESTAMP_TAG: common2::println("num: ", num, ", LSM6DSV16X_TIMESTAMP_TAG tag"); return true;
+			case LSM6DSV16X_FIFO_EMPTY: return NoData{};
+			case LSM6DSV16X_GY_NC_TAG: return GyroDataRaw{.bytes = {f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3], f_data.data[4], f_data.data[5]}};
+			case LSM6DSV16X_XL_NC_TAG: return AccelerationDataRaw{.bytes = {f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3], f_data.data[4], f_data.data[5]}};
+			case LSM6DSV16X_TEMPERATURE_TAG: return NoData{};
+			case LSM6DSV16X_TIMESTAMP_TAG: return std::uint64_t{std::bit_cast<std::uint32_t>(std::array{f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3]})};
+			case LSM6DSV16X_CFG_CHANGE_TAG: return NoData{};
+			case LSM6DSV16X_XL_NC_T_2_TAG: return NoData{};
+			case LSM6DSV16X_XL_NC_T_1_TAG: return NoData{};
+			case LSM6DSV16X_XL_2XC_TAG: return NoData{};
+			case LSM6DSV16X_XL_3XC_TAG: return NoData{};
+			case LSM6DSV16X_GY_NC_T_2_TAG: return NoData{};
+			case LSM6DSV16X_GY_NC_T_1_TAG: return NoData{};
+			case LSM6DSV16X_GY_2XC_TAG: return NoData{};
+			case LSM6DSV16X_GY_3XC_TAG: return NoData{};
+			case LSM6DSV16X_SENSORHUB_SLAVE0_TAG: return NoData{};
+			case LSM6DSV16X_SENSORHUB_SLAVE1_TAG: return NoData{};
+			case LSM6DSV16X_SENSORHUB_SLAVE2_TAG: return NoData{};
+			case LSM6DSV16X_SENSORHUB_SLAVE3_TAG: return NoData{};
+			case LSM6DSV16X_STEP_COUNTER_TAG: return {};
+			case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return NoData{};
+			case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return NoData{};
+			case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return NoData{};
+			case LSM6DSV16X_SENSORHUB_NACK_TAG: return NoData{};
+			case LSM6DSV16X_MLC_RESULT_TAG: return NoData{};
+			case LSM6DSV16X_MLC_FILTER: return NoData{};
+			case LSM6DSV16X_MLC_FEATURE: return NoData{};
+			case LSM6DSV16X_XL_DUAL_CORE: return NoData{};
+			case LSM6DSV16X_GY_ENHANCED_EIS: return NoData{};
 		}
 	}
 
-	// case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG tag"); return true;
-	// case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG tag: "); return true;
-	// case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: common2::println("num: ", num, ", LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG tag: "); return true;
-	// default: common2::print("num: ", num, ", Unknown tag: ", static_cast<std::uint8_t>(f_data.tag));
-
-	return false;
+	common2::println(messages);
+	return NoData{};
 }

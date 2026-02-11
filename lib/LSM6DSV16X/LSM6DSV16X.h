@@ -18,8 +18,10 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	lsm6dsv16x_data_ready_t drdy;
 	std::array<std::uint64_t, 0x1E> messages = {};
 
-	lsm6dsv16x_xl_full_scale_t accel_scale = LSM6DSV16X_2g;
-	lsm6dsv16x_gy_full_scale_t gyro_scale = LSM6DSV16X_1000dps;
+	lsm6dsv16x_xl_full_scale_t accel_scale = LSM6DSV16X_16g;
+	lsm6dsv16x_gy_full_scale_t gyro_scale = LSM6DSV16X_4000dps;
+
+	void init() const;
 
    public:
 	TwoWire *i2c;
@@ -29,6 +31,7 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	void begin_self_test(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_fifo(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
+	void begin_minimal() const;
 
 	static std::int32_t platform_write(void *handle, std::uint8_t reg, const std::uint8_t *bufp, std::uint16_t len);
 	static std::int32_t platform_read(void *handle, std::uint8_t reg, std::uint8_t *bufp, std::uint16_t len);
@@ -78,7 +81,8 @@ class LSM6DSV16X : public stmdev_ctx_t {
 
 		return NAN;
 	}
-	bool get_measurement_fifo();
+	struct NoData {};
+	std::variant<NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> get_measurement_fifo();
 };
 
 /*
