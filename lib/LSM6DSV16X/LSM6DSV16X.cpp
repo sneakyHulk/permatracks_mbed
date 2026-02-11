@@ -486,31 +486,82 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 		delay(100);
 	}
 	common2::println("Done!");
+}
+void LSM6DSV16X::begin_sensor_fusion(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
+	accel_scale = accel_scale_value;
+	gyro_scale = gyro_scale_value;
 
-	// common2::print("Set FIFO batch of sflp data...");
-	// static lsm6dsv16x_fifo_sflp_raw_t fifo_sflp;
-	// fifo_sflp.game_rotation = 1;
-	// fifo_sflp.gravity = 1;
-	// fifo_sflp.gbias = 1;
-	// for (; lsm6dsv16x_fifo_sflp_batch_set(this, fifo_sflp);) {
-	// 	common2::print("Error! Retry...");
-	// 	delay(100);
-	// }
-	// common2::println("Done!");
+	init();
 
-	// common2::print("Set sflp Output Data Rate...");
-	// for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_30Hz);) {
-	//	common2::print("Error! Retry...");
-	//	delay(100);
-	// }
-	// common2::println("Done!");
-	//
-	// common2::print("Enable Game Rotation...");
-	// for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
-	//	common2::print("Error! Retry...");
-	//	delay(100);
-	//}
-	// common2::println("Done!");
+	// Set full scale
+	common2::print("Set Accelerometer full scale...");
+	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+	common2::print("Set Gyro full scale...");
+	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Set FIFO watermark...");
+	for (; lsm6dsv16x_fifo_watermark_set(this, 32);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+	common2::print("Set FIFO batch of sflp data...");
+	lsm6dsv16x_fifo_sflp_raw_t fifo_sflp{.game_rotation = 1, .gravity = 1, .gbias = 1};
+	for (; lsm6dsv16x_fifo_sflp_batch_set(this, fifo_sflp);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Set FIFO mode to Stream mode (aka Continuous Mode)...");
+	for (; lsm6dsv16x_fifo_mode_set(this, LSM6DSV16X_STREAM_MODE);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Set Accelerometer Output Data Rate...");
+	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_30Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Set Gyro Output Data Rate...");
+	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_30Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Set sflp Output Data Rate...");
+	for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_30Hz);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+	common2::print("Enable Game Rotation...");
+	for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
+
+	common2::print("Initialize Gyro Offset...");
+	lsm6dsv16x_sflp_gbias_t gbias{.gbias_x = 0.0f, .gbias_y = 0.0f, .gbias_z = 0.0f};
+	for (; lsm6dsv16x_sflp_game_gbias_set(this, &gbias);) {
+		common2::print("Error! Retry...");
+		delay(100);
+	}
+	common2::println("Done!");
 }
 void LSM6DSV16X::begin_minimal() const {
 	init();
@@ -630,7 +681,7 @@ std::optional<AccelerationDataRaw> LSM6DSV16X::get_measurement_accelerometer() c
 	if (drdy.drdy_xl) {
 		AccelerationDataRaw accel_data_raw{};
 
-		for (; lsm6dsv16x_acceleration_raw_get(this, accel_data_raw.arr);) {
+		for (; lsm6dsv16x_acceleration_raw_get(this, accel_data_raw.arr.data());) {
 			common2::print("Error! Retry...");
 			delay(100);
 		}
@@ -645,7 +696,7 @@ std::optional<GyroDataRaw> LSM6DSV16X::get_measurement_gyro() const {
 	if (drdy.drdy_gy) {
 		GyroDataRaw gyro_data_raw{};
 
-		for (; lsm6dsv16x_angular_rate_raw_get(this, gyro_data_raw.arr);) {
+		for (; lsm6dsv16x_angular_rate_raw_get(this, gyro_data_raw.arr.data());) {
 			common2::print("Error! Retry...");
 			delay(100);
 		}
@@ -668,37 +719,62 @@ std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t
 		++messages[f_data.tag];
 
 		switch (f_data.tag) {
-			case LSM6DSV16X_FIFO_EMPTY: return NoData{};
-			case LSM6DSV16X_GY_NC_TAG: return GyroDataRaw{.bytes = {f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3], f_data.data[4], f_data.data[5]}};
-			case LSM6DSV16X_XL_NC_TAG: return AccelerationDataRaw{.bytes = {f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3], f_data.data[4], f_data.data[5]}};
-			case LSM6DSV16X_TEMPERATURE_TAG: return NoData{};
+			case LSM6DSV16X_GY_NC_TAG: return GyroDataRaw{.bytes = std::to_array(f_data.data)};
+			case LSM6DSV16X_XL_NC_TAG: return AccelerationDataRaw{.bytes = std::to_array(f_data.data)};
 			case LSM6DSV16X_TIMESTAMP_TAG: return std::uint64_t{std::bit_cast<std::uint32_t>(std::array{f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3]})};
-			case LSM6DSV16X_CFG_CHANGE_TAG: return NoData{};
-			case LSM6DSV16X_XL_NC_T_2_TAG: return NoData{};
-			case LSM6DSV16X_XL_NC_T_1_TAG: return NoData{};
-			case LSM6DSV16X_XL_2XC_TAG: return NoData{};
-			case LSM6DSV16X_XL_3XC_TAG: return NoData{};
-			case LSM6DSV16X_GY_NC_T_2_TAG: return NoData{};
-			case LSM6DSV16X_GY_NC_T_1_TAG: return NoData{};
-			case LSM6DSV16X_GY_2XC_TAG: return NoData{};
-			case LSM6DSV16X_GY_3XC_TAG: return NoData{};
-			case LSM6DSV16X_SENSORHUB_SLAVE0_TAG: return NoData{};
-			case LSM6DSV16X_SENSORHUB_SLAVE1_TAG: return NoData{};
-			case LSM6DSV16X_SENSORHUB_SLAVE2_TAG: return NoData{};
-			case LSM6DSV16X_SENSORHUB_SLAVE3_TAG: return NoData{};
-			case LSM6DSV16X_STEP_COUNTER_TAG: return {};
-			case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return NoData{};
-			case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return NoData{};
-			case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return NoData{};
-			case LSM6DSV16X_SENSORHUB_NACK_TAG: return NoData{};
-			case LSM6DSV16X_MLC_RESULT_TAG: return NoData{};
-			case LSM6DSV16X_MLC_FILTER: return NoData{};
-			case LSM6DSV16X_MLC_FEATURE: return NoData{};
-			case LSM6DSV16X_XL_DUAL_CORE: return NoData{};
-			case LSM6DSV16X_GY_ENHANCED_EIS: return NoData{};
+			default: return NoData{};
 		}
 	}
 
 	common2::println(messages);
 	return NoData{};
+}
+std::variant<LSM6DSV16X::NoData, RotationQuaternion, LSM6DSV16X::GBiasVectorRaw, LSM6DSV16X::GravityVectorRaw> LSM6DSV16X::get_measurement_sensor_fusion() {
+	for (; num; --num) {
+		lsm6dsv16x_fifo_out_raw_t f_data;
+
+		for (; lsm6dsv16x_fifo_out_raw_get(this, &f_data);) {
+			common2::print("Error! Retry...");
+			delay(100);
+		}
+
+		++messages[f_data.tag];
+
+		switch (f_data.tag) {
+			case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return RotationQuaternion{.arr = sflp2q(std::bit_cast<std::array<std::uint16_t, 3>>(std::to_array(f_data.data)))};
+			case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return GBiasVectorRaw{.bytes = std::to_array(f_data.data)};
+			case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVectorRaw{.bytes = std::to_array(f_data.data)};
+			default: return NoData{};
+		}
+	}
+
+	common2::println(messages);
+	return NoData{};
+}
+
+float LSM6DSV16X::npy_half_to_float(std::uint16_t const h) {
+	union {
+		float_t ret;
+		uint32_t retbits;
+	} conv;
+	conv.retbits = lsm6dsv16x_from_f16_to_f32(h);
+	return conv.ret;
+}
+
+std::array<float, 4> LSM6DSV16X::sflp2q(std::array<std::uint16_t, 3> sflp) {
+	std::array<float, 4> quat{npy_half_to_float(sflp[0]), npy_half_to_float(sflp[1]), npy_half_to_float(sflp[2])};
+
+	float sumsq = quat[0] * quat[0] + quat[1] * quat[1] + quat[2] * quat[2];
+
+	if (sumsq > 1.0f) {
+		float const n = sqrtf(sumsq);
+		quat[0] /= n;
+		quat[1] /= n;
+		quat[2] /= n;
+		sumsq = 1.0f;
+	}
+
+	quat[3] = sqrtf(1.0f - sumsq);
+
+	return quat;
 }

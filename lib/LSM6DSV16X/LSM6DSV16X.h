@@ -2,6 +2,7 @@
 
 #include <AccelerationDataRaw.h>
 #include <GyroDataRaw.h>
+#include <RotationQuaternion.h>
 #include <Wire.h>
 #include <common2.h>
 #include <lsm6dsv16x_reg.h>
@@ -31,6 +32,7 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	void begin_self_test(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_fifo(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
+	void begin_sensor_fusion(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_minimal() const;
 
 	static std::int32_t platform_write(void *handle, std::uint8_t reg, const std::uint8_t *bufp, std::uint16_t len);
@@ -40,22 +42,28 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	void start_measurement();
 	void start_measurement_fifo();
 
-	struct GravityVector {
-		float x;
-		float y;
-		float z;
+#pragma pack(push, 1)
+	struct GravityVectorRaw {
+		union {
+			struct {
+				std::int16_t x;
+				std::int16_t y;
+				std::int16_t z;
+			};
+			std::array<std::uint8_t, 6> bytes;
+		};
 	};
-	struct GBiasVector {
-		float x;
-		float y;
-		float z;
+	struct GBiasVectorRaw {
+		union {
+			struct {
+				std::int16_t x;
+				std::int16_t y;
+				std::int16_t z;
+			};
+			std::array<std::uint8_t, 6> bytes;
+		};
 	};
-	struct RotationQuaternion {
-		float x;
-		float y;
-		float z;
-		float w;
-	};
+#pragma pack(pop)
 
 	[[nodiscard]] std::optional<AccelerationDataRaw> get_measurement_accelerometer() const;
 	[[nodiscard]] float get_scale_factor_accelerometer() const {
@@ -83,6 +91,10 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	}
 	struct NoData {};
 	std::variant<NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> get_measurement_fifo();
+	std::variant<NoData, RotationQuaternion, GBiasVectorRaw, GravityVectorRaw> get_measurement_sensor_fusion();
+
+	static float npy_half_to_float(std::uint16_t h);
+	static std::array<float, 4> sflp2q(std::array<std::uint16_t, 3> sflp);
 };
 
 /*
