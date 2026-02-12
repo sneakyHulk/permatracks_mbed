@@ -203,8 +203,6 @@ void setup() {
 
 	delay(100);
 
-	return;
-
 	{  // connect AK09940A
 		delay(100);
 
@@ -343,17 +341,8 @@ void print(MagneticFluxDensityDataRawAK09940A const data) {
 }
 
 void poll_imu() {
+#if NDEBUG
 	static CRC8 crc8;
-
-#if not NDEBUG
-	if (auto accel_data = imu.get_measurement_accelerometer(); accel_data) {
-		common2::println("Accelerometer: ", accel_data.value());
-	}
-	if (auto gyro_data = imu.get_measurement_gyro(); gyro_data) {
-		common2::println("Gyro: ", gyro_data.value());
-	}
-#endif
-
 	if (auto const accel_data = imu.get_measurement_accelerometer(); accel_data) {
 		Serial.write(static_cast<std::uint8_t>('A'));
 
@@ -394,10 +383,20 @@ void poll_imu() {
 
 		crc8.restart();
 	}
+#else
+	if (auto accel_data = imu.get_measurement_accelerometer(); accel_data) {
+		common2::println("Accelerometer: ", accel_data.value());
+	}
+	if (auto gyro_data = imu.get_measurement_gyro(); gyro_data) {
+		common2::println("Gyro: ", gyro_data.value());
+	}
+#endif
 }
 
 void poll_imu_fifo() {
+#if NDEBUG
 	static CRC8 crc8;
+#else
 	for (std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_fifo());) {
 		if (std::holds_alternative<AccelerationDataRaw>(val)) {
 			common2::println("Accelerometer: ", std::get<AccelerationDataRaw>(val));
@@ -409,37 +408,69 @@ void poll_imu_fifo() {
 			common2::println("Timestamp: ", std::get<std::uint64_t>(val));
 		}
 	}
+#endif
 }
 
 void poll_imu_sensor_fusion() {
+#if NDEBUG
 	static CRC8 crc8;
-	for (std::variant<LSM6DSV16X::NoData, RotationQuaternion, LSM6DSV16X::GBiasVectorRaw, LSM6DSV16X::GravityVectorRaw> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_sensor_fusion());) {
+	for (std::variant<LSM6DSV16X::NoData, RotationQuaternion, GyroBiasVector, GravityVector> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_sensor_fusion());) {
+		if (std::holds_alternative<RotationQuaternion>(val)) {
+			auto const quaternion = std::get<RotationQuaternion>(val);
+			Serial.write(static_cast<std::uint8_t>('R'));
+
+			Serial.write(quaternion.bytes.data(), quaternion.bytes.size());
+			crc8.add(quaternion.bytes.data(), quaternion.bytes.size());
+
+			Serial.write(crc8.calc());
+
+			Serial.write(static_cast<std::uint8_t>('R'));
+			crc8.restart();
+		} else if (std::holds_alternative<GyroBiasVector>(val)) {
+			auto const gyro_bias = std::get<GyroBiasVector>(val);
+			Serial.write(static_cast<std::uint8_t>('B'));
+
+			Serial.write(gyro_bias.bytes.data(), gyro_bias.bytes.size());
+			crc8.add(gyro_bias.bytes.data(), gyro_bias.bytes.size());
+
+			Serial.write(crc8.calc());
+
+			Serial.write(static_cast<std::uint8_t>('B'));
+			crc8.restart();
+		} else if (std::holds_alternative<GravityVector>(val)) {
+			auto const vec = std::get<GravityVector>(val);
+			Serial.write(static_cast<std::uint8_t>('V'));
+
+			Serial.write(vec.bytes.data(), vec.bytes.size());
+			crc8.add(vec.bytes.data(), vec.bytes.size());
+
+			Serial.write(crc8.calc());
+
+			Serial.write(static_cast<std::uint8_t>('V'));
+			crc8.restart();
+		}
+	}
+#else
+	for (std::variant<LSM6DSV16X::NoData, RotationQuaternion, GyroBiasVector, GravityVector> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_sensor_fusion());) {
 		if (std::holds_alternative<RotationQuaternion>(val)) {
 			auto const tmp = std::get<RotationQuaternion>(val);
 			common2::println("RotationQuaternion: x = ", tmp.rx, ", y = ", tmp.ry, ", z = ", tmp.rz, ", w = ", tmp.rw);
 		}
-		if (std::holds_alternative<LSM6DSV16X::GBiasVectorRaw>(val)) {
-			auto const tmp = std::get<LSM6DSV16X::GBiasVectorRaw>(val);
-			common2::println("GBiasVector: x = ", tmp.x * 4.375f, ", y = ", tmp.y * 4.375f, ", z = ", tmp.z * 4.375f);
+		if (std::holds_alternative<GyroBiasVector>(val)) {
+			auto const tmp = std::get<GyroBiasVector>(val);
+			common2::println("GyroBiasVector: x = ", tmp.gbx, ", y = ", tmp.gby, ", z = ", tmp.gbz);
 		}
-		if (std::holds_alternative<LSM6DSV16X::GravityVectorRaw>(val)) {
-			auto tmp = std::get<LSM6DSV16X::GravityVectorRaw>(val);
-			common2::println("GravityVector: x = ", tmp.x * 0.061f, ", y = ", tmp.y * 0.061f, ", z = ", tmp.z * 0.061f);
+		if (std::holds_alternative<GravityVector>(val)) {
+			auto const tmp = std::get<GravityVector>(val);
+			common2::println("GravityVector: x = ", tmp.gvx, ", y = ", tmp.gvy, ", z = ", tmp.gvz);
 		}
 	}
+#endif
 }
 
 void loop() {
 	static CRC16 crc16(0x8005, 0, false, true, true);
 	decltype(micros()) t1;
-
-	imu.start_measurement_fifo();
-
-	poll_imu_sensor_fusion();
-
-	delay(20);
-
-	return;
 
 	{  // trigger sensors
 		digitalWrite(PI_7, HIGH);
@@ -447,6 +478,12 @@ void loop() {
 		digitalWrite(PI_7, LOW);
 		t1 = micros();
 		// delayMicroseconds(3100);
+	}
+
+	{  // get imu data
+		imu.start_measurement_fifo();
+
+		poll_imu_sensor_fusion();
 	}
 
 	{  // check overflow

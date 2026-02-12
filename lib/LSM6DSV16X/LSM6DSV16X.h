@@ -1,6 +1,8 @@
 #pragma once
 
 #include <AccelerationDataRaw.h>
+#include <GravityVector.h>
+#include <GyroBiasVector.h>
 #include <GyroDataRaw.h>
 #include <RotationQuaternion.h>
 #include <Wire.h>
@@ -33,6 +35,7 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	void begin(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_fifo(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_sensor_fusion(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
+	void begin_both(lsm6dsv16x_xl_full_scale_t accel_scale_value = LSM6DSV16X_2g, lsm6dsv16x_gy_full_scale_t gyro_scale_value = LSM6DSV16X_1000dps);
 	void begin_minimal() const;
 
 	static std::int32_t platform_write(void *handle, std::uint8_t reg, const std::uint8_t *bufp, std::uint16_t len);
@@ -41,29 +44,6 @@ class LSM6DSV16X : public stmdev_ctx_t {
 
 	void start_measurement();
 	void start_measurement_fifo();
-
-#pragma pack(push, 1)
-	struct GravityVectorRaw {
-		union {
-			struct {
-				std::int16_t x;
-				std::int16_t y;
-				std::int16_t z;
-			};
-			std::array<std::uint8_t, 6> bytes;
-		};
-	};
-	struct GBiasVectorRaw {
-		union {
-			struct {
-				std::int16_t x;
-				std::int16_t y;
-				std::int16_t z;
-			};
-			std::array<std::uint8_t, 6> bytes;
-		};
-	};
-#pragma pack(pop)
 
 	[[nodiscard]] std::optional<AccelerationDataRaw> get_measurement_accelerometer() const;
 	[[nodiscard]] float get_scale_factor_accelerometer() const {
@@ -91,10 +71,12 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	}
 	struct NoData {};
 	std::variant<NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> get_measurement_fifo();
-	std::variant<NoData, RotationQuaternion, GBiasVectorRaw, GravityVectorRaw> get_measurement_sensor_fusion();
+	std::variant<NoData, RotationQuaternion, GyroBiasVector, GravityVector> get_measurement_sensor_fusion();
 
 	static float npy_half_to_float(std::uint16_t h);
 	static std::array<float, 4> sflp2q(std::array<std::uint16_t, 3> sflp);
+	static std::array<float, 3> sflp2gbv(std::array<std::int16_t, 3> sflp);
+	static std::array<float, 3> sflp2gv(std::array<std::int16_t, 3> sflp);
 };
 
 /*
