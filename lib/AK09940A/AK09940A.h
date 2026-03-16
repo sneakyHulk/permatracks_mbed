@@ -13,7 +13,7 @@ class AK09940A final {
    public:
 	std::uint8_t n = N++;
 
-	static std::uint32_t get_scale_factor() { return 100'000'000U; }
+	static std::int32_t get_scale_factor() { return 100'000'000; }
 
    private:
 	SPIClass* spi;

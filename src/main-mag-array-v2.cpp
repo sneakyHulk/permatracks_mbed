@@ -194,7 +194,7 @@ void setup() {
 
 	{  // config I2C2 and imu
 		i2c2.begin();
-		// i2c2.setClock(10'000);
+		i2c2.setClock(400'000);
 
 		delay(100);
 
