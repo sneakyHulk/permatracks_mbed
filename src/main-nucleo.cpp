@@ -9,6 +9,7 @@
 #include <ranges>
 
 #include "AK09940A.h"
+#include <MagneticFluxDensityDataRawAK09940A.h>
 #include "CRC16.h"
 #include "RunningAverage.h"
 
@@ -48,6 +49,7 @@ constexpr std::uint8_t ST2 = 0x1B;     // ST2
 constexpr std::uint8_t HXL = 0x11;     // mag data read start
 
 inline void spiWrite(uint8_t reg, uint8_t data) {
+	spi.beginTransaction();
 	digitalWrite(CS_PIN, LOW);
 	spi.transfer(reg & 0x7F);  // bit-7 = 0 → write
 	spi.transfer(data);
@@ -157,7 +159,7 @@ void setup() {
 #endif
 
 	delay(100);
-	spi.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE0));  // AK09940A uses SPI Mode 3
+	spi.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));  // AK09940A uses SPI Mode 3
 
 #endif
 	Serial.println("beginTransaction()");
@@ -439,9 +441,9 @@ void loop() {
 
 #ifndef CONTINUOUS
 	digitalWrite(TRG_PIN, HIGH);
-	delayMicroseconds(100);  // > 3us
+	delayMicroseconds(5);  // > 3us
 	digitalWrite(TRG_PIN, LOW);
-	delay(5);  // > 3.1ms
+	delayMicroseconds(4100);  // > 3.1ms
 #endif
 
 	delay(13);
@@ -511,11 +513,11 @@ void loop() {
 	std::int32_t const y_raw2 = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
 	std::int32_t const z_raw2 = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
 
-	AK09940A::MagneticFluxDensityDataRaw ak09940a;
-
-	ak09940a.x = x_raw2;
-	ak09940a.y = y_raw2;
-	ak09940a.z = z_raw2;
+	//MagneticFluxDensityDataRawAK09940A ak09940a;
+//
+	//ak09940a.x = x_raw2;
+	//ak09940a.y = y_raw2;
+	//ak09940a.z = z_raw2;
 
 	// static CRC16 crc(0x8005, 0, false, true, true);
 	// crc.restart();

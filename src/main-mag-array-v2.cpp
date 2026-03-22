@@ -474,7 +474,7 @@ void loop() {
 
 	{  // trigger sensors
 		digitalWrite(PI_7, HIGH);
-		delayMicroseconds(30);  // > 3us
+		delayMicroseconds(5);  // > 3us
 		digitalWrite(PI_7, LOW);
 		t1 = micros();
 		// delayMicroseconds(3100);
