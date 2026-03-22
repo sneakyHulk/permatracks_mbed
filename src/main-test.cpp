@@ -83,18 +83,18 @@ void setup() {
 	auto cntl1 = spi_read(CNTL1);
 	Serial.println(cntl1, BIN);
 	cntl1 &= ~0b0000'0111;  // clear WM
-	cntl1 |= 0b0000'0111;
+	cntl1 |= 0b0000'0000;
 	spi_write(CNTL1, cntl1);
 
 	delayMicroseconds(1000);
 	cntl1 = spi_read(CNTL1);
 	Serial.println(cntl1, BIN);
 
-	spi_write(CNTL3, 0b1110'0010);
+	spi_write(CNTL3, 0b0110'1000);
 
 	delayMicroseconds(1000);
 
-	if (auto const mode = spi_read(CNTL3); (mode & 0b0001'1111) != 0b0000'0010) {
+	if (auto const mode = spi_read(CNTL3); (mode & 0b0001'1111) != 0b0000'1000) {
 		while (true);
 	} else {
 		Serial.println(mode, BIN);
@@ -111,65 +111,70 @@ bool ready() {
 
 void loop() {
 	if (ready()) {
-		for (int i = 0; i < 8; i++) {
-			spi.beginTransaction(settings);
-			digitalWrite(CS_PIN, LOW);
+		// for (int i = 0; i < 8; i++) {
+		spi.beginTransaction(settings);
+		digitalWrite(CS_PIN, LOW);
 
-			spi.transfer(ST1 | 0x80);
-			std::uint8_t const st1 = spi.transfer(0x00);
+		spi.transfer(ST1 | 0x80);
+		std::uint8_t const st1 = spi.transfer(0x00);
 
-			// if (!(st1 & 0b0000'0001)) {
-			// 	Serial.println("Not DRDY");
-			// 	digitalWrite(CS_PIN, HIGH);
-			// 	spi.endTransaction();
-			// 	break;
-			// }
+		// if (!(st1 & 0b0000'0001)) {
+		// 	Serial.println("Not DRDY");
+		// 	digitalWrite(CS_PIN, HIGH);
+		// 	spi.endTransaction();
+		// 	break;
+		// }
 
-			std::uint8_t const hxl = spi.transfer(0x00);
-			std::uint8_t const hxm = spi.transfer(0x00);
-			std::uint8_t const hxh = spi.transfer(0x00);
-			std::uint8_t const hyl = spi.transfer(0x00);
-			std::uint8_t const hym = spi.transfer(0x00);
-			std::uint8_t const hyh = spi.transfer(0x00);
-			std::uint8_t const hzl = spi.transfer(0x00);
-			std::uint8_t const hzm = spi.transfer(0x00);
-			std::uint8_t const hzh = spi.transfer(0x00);
-			std::uint8_t const tmps = spi.transfer(0x00);
-			std::uint8_t const dor = spi.transfer(0x00);
+		std::uint8_t const hxl = spi.transfer(0x00);
+		std::uint8_t const hxm = spi.transfer(0x00);
+		std::uint8_t const hxh = spi.transfer(0x00);
+		std::uint8_t const hyl = spi.transfer(0x00);
+		std::uint8_t const hym = spi.transfer(0x00);
+		std::uint8_t const hyh = spi.transfer(0x00);
+		std::uint8_t const hzl = spi.transfer(0x00);
+		std::uint8_t const hzm = spi.transfer(0x00);
+		std::uint8_t const hzh = spi.transfer(0x00);
+		std::uint8_t const tmps = spi.transfer(0x00);
+		std::uint8_t const dor = spi.transfer(0x00);
 
-			std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
-			std::uint32_t const y_raw = (static_cast<std::uint32_t>(hyh & 0x03) << 16) | (static_cast<std::uint32_t>(hym) << 8) | static_cast<std::uint32_t>(hyl);
-			std::uint32_t const z_raw = (static_cast<std::uint32_t>(hzh & 0x03) << 16) | (static_cast<std::uint32_t>(hzm) << 8) | static_cast<std::uint32_t>(hzl);
+		std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
+		std::uint32_t const y_raw = (static_cast<std::uint32_t>(hyh & 0x03) << 16) | (static_cast<std::uint32_t>(hym) << 8) | static_cast<std::uint32_t>(hyl);
+		std::uint32_t const z_raw = (static_cast<std::uint32_t>(hzh & 0x03) << 16) | (static_cast<std::uint32_t>(hzm) << 8) | static_cast<std::uint32_t>(hzl);
 
-			std::int32_t const hx = static_cast<std::int32_t>(x_raw & 0x20000 ? x_raw - 0x40000 : x_raw);
-			std::int32_t const hy = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
-			std::int32_t const hz = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
+		std::int32_t const hx = static_cast<std::int32_t>(x_raw & 0x20000 ? x_raw - 0x40000 : x_raw);
+		std::int32_t const hy = static_cast<std::int32_t>(y_raw & 0x20000 ? y_raw - 0x40000 : y_raw);
+		std::int32_t const hz = static_cast<std::int32_t>(z_raw & 0x20000 ? z_raw - 0x40000 : z_raw);
 
-			double const x_T = static_cast<double>(hx) / 100'000'000.;
-			double const y_T = static_cast<double>(hy) / 100'000'000.;
-			double const z_T = static_cast<double>(hz) / 100'000'000.;
+		double const x_T = static_cast<double>(hx) / 100'000'000.;
+		double const y_T = static_cast<double>(hy) / 100'000'000.;
+		double const z_T = static_cast<double>(hz) / 100'000'000.;
 
-			stats_x.addValue(x_T);
-			stats_y.addValue(y_T);
-			stats_z.addValue(z_T);
+		stats_x.addValue(x_T);
+		stats_y.addValue(y_T);
+		stats_z.addValue(z_T);
 
-			Serial.print("X: ");
-			Serial.print(x_T * 1e6);
-			Serial.print(", Y: ");
-			Serial.print(y_T * 1e6);
-			Serial.print(", Z: ");
-			Serial.print(z_T * 1e6);
-			Serial.print(", std X: ");
-			Serial.print(stats_x.getStandardDeviation() * 1e6, 2);
-			Serial.print(", std Y: ");
-			Serial.print(stats_y.getStandardDeviation() * 1e6, 2);
-			Serial.print(", std Z: ");
-			Serial.println(stats_z.getStandardDeviation() * 1e6, 2);
-			Serial.println();
+		Serial.print(static_cast<std::uint64_t>(millis()) * 1'000'000U);
+		Serial.print(",");
+		// Serial.print("X: ");
+		Serial.print(x_T * 1e6);
+		// Serial.print(", Y: ");
+		Serial.print(",");
+		Serial.print(y_T * 1e6);
+		// Serial.print(", Z: ");
+		Serial.print(",");
+		Serial.print(z_T * 1e6);
+		Serial.println();
+		// Serial.print(", std X: ");
+		// Serial.print(stats_x.getStandardDeviation() * 1e6, 2);
+		// Serial.print(", std Y: ");
+		// Serial.print(stats_y.getStandardDeviation() * 1e6, 2);
+		// Serial.print(", std Z: ");
+		// Serial.println(stats_z.getStandardDeviation() * 1e6, 2);
+		// Serial.println();
 
-			digitalWrite(CS_PIN, HIGH);
-			spi.endTransaction();
-		}
+		digitalWrite(CS_PIN, HIGH);
+		spi.endTransaction();
+		//}
 	}
 }
 
