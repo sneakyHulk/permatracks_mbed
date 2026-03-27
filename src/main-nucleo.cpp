@@ -49,7 +49,6 @@ constexpr std::uint8_t ST2 = 0x1B;     // ST2
 constexpr std::uint8_t HXL = 0x11;     // mag data read start
 
 inline void spiWrite(uint8_t reg, uint8_t data) {
-	spi.beginTransaction();
 	digitalWrite(CS_PIN, LOW);
 	spi.transfer(reg & 0x7F);  // bit-7 = 0 → write
 	spi.transfer(data);

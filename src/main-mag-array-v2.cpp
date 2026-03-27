@@ -185,9 +185,9 @@ void setup() {
 	delay(100);
 
 	{  // config spis
-		spi1.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
-		spi2.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
-		spi3.beginTransaction(SPISettings(3'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+		spi1.beginTransaction(SPISettings(2'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+		spi2.beginTransaction(SPISettings(2'000'000, BitOrder::MSBFIRST, SPI_MODE3));
+		spi3.beginTransaction(SPISettings(2'000'000, BitOrder::MSBFIRST, SPI_MODE3));
 	}
 
 	delay(100);
@@ -490,6 +490,7 @@ void loop() {
 		// std::tie(time_delay, time_offset) = common::sync_time();
 		if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
 			common2::message("micros overflow detected!");
+			delayMicroseconds(3100);
 			return;
 		}
 	}

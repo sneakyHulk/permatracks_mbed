@@ -90,11 +90,11 @@ void setup() {
 	cntl1 = spi_read(CNTL1);
 	Serial.println(cntl1, BIN);
 
-	spi_write(CNTL3, 0b0110'1000);
+	spi_write(CNTL3, 0b0110'1010);
 
 	delayMicroseconds(1000);
 
-	if (auto const mode = spi_read(CNTL3); (mode & 0b0001'1111) != 0b0000'1000) {
+	if (auto const mode = spi_read(CNTL3); (mode & 0b0001'1111) != 0b0000'1010) {
 		while (true);
 	} else {
 		Serial.println(mode, BIN);
@@ -137,6 +137,8 @@ void loop() {
 		std::uint8_t const tmps = spi.transfer(0x00);
 		std::uint8_t const dor = spi.transfer(0x00);
 
+		double const temp = 30.0 - static_cast<std::int8_t>(tmps) / 1.7;
+
 		std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
 		std::uint32_t const y_raw = (static_cast<std::uint32_t>(hyh & 0x03) << 16) | (static_cast<std::uint32_t>(hym) << 8) | static_cast<std::uint32_t>(hyl);
 		std::uint32_t const z_raw = (static_cast<std::uint32_t>(hzh & 0x03) << 16) | (static_cast<std::uint32_t>(hzm) << 8) | static_cast<std::uint32_t>(hzl);
@@ -153,7 +155,7 @@ void loop() {
 		stats_y.addValue(y_T);
 		stats_z.addValue(z_T);
 
-		Serial.print(static_cast<std::uint64_t>(millis()) * 1'000'000U);
+		Serial.print(static_cast<std::uint64_t>(micros()) * 1'000U);
 		Serial.print(",");
 		// Serial.print("X: ");
 		Serial.print(x_T * 1e6);
@@ -163,14 +165,15 @@ void loop() {
 		// Serial.print(", Z: ");
 		Serial.print(",");
 		Serial.print(z_T * 1e6);
-		Serial.println();
+		Serial.print(",");
+		Serial.print(temp);
 		// Serial.print(", std X: ");
 		// Serial.print(stats_x.getStandardDeviation() * 1e6, 2);
 		// Serial.print(", std Y: ");
 		// Serial.print(stats_y.getStandardDeviation() * 1e6, 2);
 		// Serial.print(", std Z: ");
 		// Serial.println(stats_z.getStandardDeviation() * 1e6, 2);
-		// Serial.println();
+		Serial.println();
 
 		digitalWrite(CS_PIN, HIGH);
 		spi.endTransaction();

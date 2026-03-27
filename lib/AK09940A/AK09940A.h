@@ -106,7 +106,7 @@ class AK09940A final {
 			// set external trigger mode and low noise drive 2
 			common2::print_time_loc(millis(), '\'', "AK09940A ", n, '\'', " set external trigger mode and low noise drive 2...");
 			spiWrite(CNTL3, 0b0111'1000);
-			delayMicroseconds(200);
+			delayMicroseconds(300);
 			common2::println("Done!");
 		}
 
