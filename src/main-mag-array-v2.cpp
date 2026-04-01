@@ -198,7 +198,7 @@ void setup() {
 
 		delay(100);
 
-		imu.begin_sensor_fusion();
+		imu.begin_fifo();
 	}
 
 	delay(100);
@@ -396,6 +396,56 @@ void poll_imu() {
 void poll_imu_fifo() {
 #if NDEBUG
 	static CRC8 crc8;
+	static std::uint64_t fifo_timestamp = 0;
+	for (std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_fifo());) {
+		if (std::holds_alternative<AccelerationDataRaw>(val)) {
+			auto const accel_data = std::get<AccelerationDataRaw>(val);
+
+			Serial.write(static_cast<std::uint8_t>('A'));
+
+			auto const scale_imu_accel = std::bit_cast<std::array<std::uint8_t, sizeof(float)>>(imu.get_scale_factor_accelerometer());
+			Serial.write(scale_imu_accel.data(), scale_imu_accel.size());
+			crc8.add(scale_imu_accel.data(), scale_imu_accel.size());
+
+			Serial.write(accel_data.bytes.data(), accel_data.bytes.size());
+			crc8.add(accel_data.bytes.data(), accel_data.bytes.size());
+
+			auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(fifo_timestamp)>>(fifo_timestamp);
+			Serial.write(timestamp_.data(), timestamp_.size());
+			crc8.add(timestamp_.data(), timestamp_.size());
+
+			Serial.write(crc8.calc());
+
+			Serial.write(static_cast<std::uint8_t>('A'));
+
+			crc8.restart();
+		}
+		if (std::holds_alternative<GyroDataRaw>(val)) {
+			auto const gyro_data = std::get<GyroDataRaw>(val);
+
+			Serial.write(static_cast<std::uint8_t>('G'));
+
+			auto const scale_imu_gyro = std::bit_cast<std::array<std::uint8_t, sizeof(float)>>(imu.get_scale_factor_gyro());
+			Serial.write(scale_imu_gyro.data(), scale_imu_gyro.size());
+			crc8.add(scale_imu_gyro.data(), scale_imu_gyro.size());
+
+			Serial.write(gyro_data.bytes.data(), gyro_data.bytes.size());
+			crc8.add(gyro_data.bytes.data(), gyro_data.bytes.size());
+
+			auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(fifo_timestamp)>>(fifo_timestamp);
+			Serial.write(timestamp_.data(), timestamp_.size());
+			crc8.add(timestamp_.data(), timestamp_.size());
+
+			Serial.write(crc8.calc());
+
+			Serial.write(static_cast<std::uint8_t>('G'));
+
+			crc8.restart();
+		}
+		if (std::holds_alternative<std::uint64_t>(val)) {
+			fifo_timestamp = std::get<std::uint64_t>(val);
+		}
+	}
 #else
 	for (std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> val; !std::holds_alternative<LSM6DSV16X::NoData>(val = imu.get_measurement_fifo());) {
 		if (std::holds_alternative<AccelerationDataRaw>(val)) {
@@ -483,7 +533,7 @@ void loop() {
 	{  // get imu data
 		imu.start_measurement_fifo();
 
-		poll_imu_sensor_fusion();
+		poll_imu_fifo();
 	}
 
 	{  // check overflow
