@@ -6,9 +6,9 @@
 
 #include "RunningAverage.h"
 
-RunningAverage stats_x(100);
-RunningAverage stats_y(100);
-RunningAverage stats_z(100);
+RunningAverage stats_x(200);
+RunningAverage stats_y(200);
+RunningAverage stats_z(200);
 
 constexpr std::uint8_t CNTL4 = 0x33;          // SRST bit (D0)
 constexpr std::uint8_t I2CDIS = 0x36;         // lock out I²C

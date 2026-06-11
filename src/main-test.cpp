@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <SPI.h>
+#include <common2.h>
 
 #include <cstdint>
 
@@ -11,8 +12,9 @@ RunningAverage stats_z(100);
 
 constexpr std::uint8_t CS_PIN = D10;
 constexpr std::uint8_t TRG_PIN = D7;
+constexpr std::uint8_t RSTN_PIN = PA0;
 
-SPIClass spi(PA7, PA6, PA1);
+SPIClass spi(D11, D12, PA1);
 
 constexpr std::uint8_t CNTL4 = 0x33;   // SRST bit (D0)
 constexpr std::uint8_t I2CDIS = 0x36;  // lock out I²C
@@ -27,49 +29,94 @@ constexpr std::uint8_t HXL = 0x11;     // mag data read start
 auto settings = SPISettings(1'000'000, BitOrder::MSBFIRST, SPI_MODE3);
 
 void spi_write(std::uint8_t const reg, std::uint8_t const data) {
-	spi.beginTransaction(settings);
 	digitalWrite(CS_PIN, LOW);
 
 	spi.transfer(reg & 0x7F);  // bit-7 = 0 → write
 	spi.transfer(data);
 
 	digitalWrite(CS_PIN, HIGH);
-	spi.endTransaction();
 }
 
 [[nodiscard]] std::uint8_t spi_read(uint8_t const reg) {
-	spi.beginTransaction(settings);
 	digitalWrite(CS_PIN, LOW);
 
 	spi.transfer(reg | 0x80);  // bit-7 = 1 → read
 	std::uint8_t const val = spi.transfer(0x00);
 
 	digitalWrite(CS_PIN, HIGH);
-	spi.endTransaction();
 	return val;
 }
 
+[[nodiscard]] bool check_company_device_id() {
+	constexpr static std::uint8_t WHO_AM_I1_ADDR = 0x00;
+	constexpr static std::uint8_t WHO_AM_I2_ADDR = 0x01;
+
+	constexpr static std::uint8_t EXPECTED_WIA1 = 0x48;  // Company ID ("AKM")
+	constexpr static std::uint8_t EXPECTED_WIA2 = 0xA3;  // Device ID (AK09940A)
+
+	common2::print_time_loc(millis(), '\'', "AK09940A", '\'', " check company device id...");
+
+	for (auto i = 0; i < 1; ++i) {
+		std::uint8_t wia1 = spi_read(WHO_AM_I1_ADDR);
+		delayMicroseconds(1000);
+		std::uint8_t wia2 = 0;//spi_read(WHO_AM_I2_ADDR);
+
+		if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2) {
+			common2::println("Done!");
+			return true;
+		}
+
+		common2::print("Error! WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "! Retry...");
+		delay(100);
+	}
+
+	common2::println("Abort!");
+	return false;
+}
+
 void setup() {
+	pinMode(RSTN_PIN, OUTPUT);
+	digitalWrite(RSTN_PIN, LOW);
+
+	delay(10);
+
+	pinMode(CS_PIN, OUTPUT);
+	digitalWrite(CS_PIN, LOW);
+
+	delay(10);
+
+	pinMode(TRG_PIN, OUTPUT);
+	digitalWrite(TRG_PIN, LOW);
+
+	delay(1000);
+
+	pinMode(RSTN_PIN, OUTPUT);
+	digitalWrite(RSTN_PIN, HIGH);
+
+	// while (true) {
+	// 	digitalWrite(CS_PIN, HIGH);
+	// 	delayMicroseconds(1000);
+	// 	digitalWrite(CS_PIN, LOW);
+	// 	delayMicroseconds(1000);
+	// }
+	spi.begin();
+	spi.beginTransaction(settings);
+
 	Serial.begin(230400);
 
 	delay(1000);
 	Serial.println("Hello World");
 	delay(1000);
 
-	pinMode(CS_PIN, OUTPUT);
-	digitalWrite(CS_PIN, HIGH);
-
-	delay(100);
-
-	pinMode(TRG_PIN, OUTPUT);
-	digitalWrite(TRG_PIN, LOW);
-
-	delay(100);
+	while (!check_company_device_id()) {
+		delay(1000);
+	}
 
 	// power down Mode
 	spi_write(CNTL3, 0b0000'0000);
 
 	if (auto const mode = spi_read(CNTL3); mode & 0b0001'1111) {
+		Serial.println(mode);
 		while (true);
 	}
 
@@ -110,6 +157,8 @@ bool ready() {
 }
 
 void loop() {
+	delay(1000);
+
 	if (ready()) {
 		// for (int i = 0; i < 8; i++) {
 		spi.beginTransaction(settings);

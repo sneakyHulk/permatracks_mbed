@@ -7,7 +7,7 @@
 #include <cstdint>
 
 class AK09940A final {
-	constexpr static auto retries = 200;
+	constexpr static auto retries = 5;
 	inline static std::uint8_t N = 0;
 
    public:
@@ -132,18 +132,18 @@ class AK09940A final {
 		//
 		//	if (std::uint8_t const status = spi->transfer(0x00); status & 0b0000'0001) break;
 		//} while (true);
-
 		for (auto i = 0; i < retries; ++i) {
-			spi->transfer(0x00 | 0x80);
-			std::uint8_t const wia1 = spi->transfer(0x00);
-			std::uint8_t const wia2 = spi->transfer(0x00);
-			std::uint8_t const rsv1 = spi->transfer(0x00);
-			std::uint8_t const rsv2 = spi->transfer(0x00);
+			// spi->transfer(0x00 | 0x80);
+			// std::uint8_t const wia1 = spi->transfer(0x00);
+			// std::uint8_t const wia2 = spi->transfer(0x00);
+			// std::uint8_t const rsv1 = spi->transfer(0x00);
+			// std::uint8_t const rsv2 = spi->transfer(0x00);
+
+			spi->transfer(ST1 | 0x80);
 			std::uint8_t const st1 = spi->transfer(0x00);
 
-			// common::print("WIA1: ", wia1, "/", EXPECTED_WIA1, ", WIA2: ", wia2, "/", EXPECTED_WIA2, "!");
-
-			if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2 && st1 & 0b0000'0001) {
+			// if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2 && st1 & 0b0000'0001) {
+			if (st1 & 0b0000'0001) {
 				std::uint8_t const hxl = spi->transfer(0x00);
 				std::uint8_t const hxm = spi->transfer(0x00);
 				std::uint8_t const hxh = spi->transfer(0x00);
@@ -158,13 +158,19 @@ class AK09940A final {
 
 				digitalWrite(cs_pin, HIGH);
 
+				if (dor & 0b0000'0010) {
+					// common2::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data is invalid!");
+					continue;
+				}
+
 				if ((dor & 0x01) == 1) {
-					// common::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data has been skipped!");
+					// common2::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data has been skipped!");
+					continue;
 				}
 
 				double const temp = 30.0 - static_cast<std::int8_t>(tmps) / 1.7;
 
-				// common::println('\'', "AK09940A ", n, '\'', " ", temp, "°C");
+				// common2::println('\'', "AK09940A ", n, '\'', " ", temp, "°C");
 
 				std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
 				std::uint32_t const y_raw = (static_cast<std::uint32_t>(hyh & 0x03) << 16) | (static_cast<std::uint32_t>(hym) << 8) | static_cast<std::uint32_t>(hyl);
