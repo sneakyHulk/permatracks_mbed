@@ -159,6 +159,8 @@ AK09940A ak109(&spi2, PD_15,false);
 AK09940A ak110(&spi2, PG_2, false);
 // clang-format on
 
+decltype(micros()) t0;
+
 std::uint64_t time_delay = 0;
 std::uint64_t time_offset = 0;
 std::uint64_t timestamp = 0;
@@ -321,8 +323,16 @@ void setup() {
 		ak110.begin();
 	}
 
-	{  // sync time
+	{
+		// sync time
 		std::tie(time_delay, time_offset) = common2::sync_time();
+	}
+
+	{  // trigger sensors
+		digitalWrite(PI_7, HIGH);
+		delayMicroseconds(5);  // > 3us
+		digitalWrite(PI_7, LOW);
+		t0 = micros();
 	}
 }
 
@@ -520,15 +530,6 @@ void poll_imu_sensor_fusion() {
 
 void loop() {
 	static CRC16 crc16(0x8005, 0, false, true, true);
-	decltype(micros()) t1;
-
-	{  // trigger sensors
-		digitalWrite(PI_7, HIGH);
-		delayMicroseconds(5);  // > 3us
-		digitalWrite(PI_7, LOW);
-		t1 = micros();
-		// delayMicroseconds(3100);
-	}
 
 	{  // get imu data
 		imu.start_measurement_fifo();
@@ -550,8 +551,8 @@ void loop() {
 	}
 
 	{  // poll AK09940A
-		if (auto t2 = micros(); t2 - t1 < 3100) {
-			delayMicroseconds(3100 - (t2 - t1));  // > 3.1ms
+		if (auto t1 = micros(); t1 - t0 < 3100) {
+			delayMicroseconds(3100 - (t1 - t0));  // > 3.1ms
 		}
 
 		/*ak000.start_measurement();
@@ -668,6 +669,128 @@ void loop() {
 		ak109.start_measurement();
 		ak110.start_measurement();*/
 
+		// clang-format off
+		auto const mag000 = ak000.get_measurement();
+		auto const mag001 = ak001.get_measurement();
+		auto const mag002 = ak002.get_measurement();
+		auto const mag003 = ak003.get_measurement();
+		auto const mag004 = ak004.get_measurement();
+		auto const mag005 = ak005.get_measurement();
+		auto const mag006 = ak006.get_measurement();
+		auto const mag007 = ak007.get_measurement();
+		auto const mag008 = ak008.get_measurement();
+		auto const mag009 = ak009.get_measurement();
+		auto const mag010 = ak010.get_measurement();
+		auto const mag011 = ak011.get_measurement();
+		auto const mag012 = ak012.get_measurement();
+		auto const mag013 = ak013.get_measurement();
+		auto const mag014 = ak014.get_measurement();
+		auto const mag015 = ak015.get_measurement();
+		auto const mag016 = ak016.get_measurement();
+		auto const mag017 = ak017.get_measurement();
+		auto const mag018 = ak018.get_measurement();
+		auto const mag019 = ak019.get_measurement();
+		auto const mag020 = ak020.get_measurement();
+		auto const mag021 = ak021.get_measurement();
+		auto const mag022 = ak022.get_measurement();
+		auto const mag023 = ak023.get_measurement();
+		auto const mag024 = ak024.get_measurement();
+		auto const mag025 = ak025.get_measurement();
+		auto const mag026 = ak026.get_measurement();
+		auto const mag027 = ak027.get_measurement();
+		auto const mag028 = ak028.get_measurement();
+		auto const mag029 = ak029.get_measurement();
+		auto const mag030 = ak030.get_measurement();
+		auto const mag031 = ak031.get_measurement();
+		auto const mag032 = ak032.get_measurement();
+		auto const mag033 = ak033.get_measurement();
+
+		auto const mag034 = ak034.get_measurement();
+		auto const mag035 = ak035.get_measurement();
+		auto const mag036 = ak036.get_measurement();
+		auto const mag037 = ak037.get_measurement();
+		auto const mag038 = ak038.get_measurement();
+		auto const mag039 = ak039.get_measurement();
+		auto const mag040 = ak040.get_measurement();
+		auto const mag041 = ak041.get_measurement();
+		auto const mag042 = ak042.get_measurement();
+		auto const mag043 = ak043.get_measurement();
+		auto const mag044 = ak044.get_measurement();
+		auto const mag045 = ak045.get_measurement();
+		auto const mag046 = ak046.get_measurement();
+		auto const mag047 = ak047.get_measurement();
+		auto const mag048 = ak048.get_measurement();
+		auto const mag049 = ak049.get_measurement();
+		auto const mag050 = ak050.get_measurement();
+		auto const mag051 = ak051.get_measurement();
+		auto const mag052 = ak052.get_measurement();
+		auto const mag053 = ak053.get_measurement();
+		auto const mag054 = ak054.get_measurement();
+		auto const mag055 = ak055.get_measurement();
+		auto const mag056 = ak056.get_measurement();
+		auto const mag057 = ak057.get_measurement();
+		auto const mag058 = ak058.get_measurement();
+		auto const mag059 = ak059.get_measurement();
+		auto const mag060 = ak060.get_measurement();
+		auto const mag061 = ak061.get_measurement();
+		auto const mag062 = ak062.get_measurement();
+		auto const mag063 = ak063.get_measurement();
+		auto const mag064 = ak064.get_measurement();
+		auto const mag065 = ak065.get_measurement();
+		auto const mag066 = ak066.get_measurement();
+		auto const mag067 = ak067.get_measurement();
+		auto const mag068 = ak068.get_measurement();
+		auto const mag069 = ak069.get_measurement();
+		auto const mag070 = ak070.get_measurement();
+		auto const mag071 = ak071.get_measurement();
+		auto const mag072 = ak072.get_measurement();
+		auto const mag073 = ak073.get_measurement();
+		auto const mag074 = ak074.get_measurement();
+		auto const mag075 = ak075.get_measurement();
+		auto const mag076 = ak076.get_measurement();
+
+		auto const mag077 = ak077.get_measurement();
+		auto const mag078 = ak078.get_measurement();
+		auto const mag079 = ak079.get_measurement();
+		auto const mag080 = ak080.get_measurement();
+		auto const mag081 = ak081.get_measurement();
+		auto const mag082 = ak082.get_measurement();
+		auto const mag083 = ak083.get_measurement();
+		auto const mag084 = ak084.get_measurement();
+		auto const mag085 = ak085.get_measurement();
+		auto const mag086 = ak086.get_measurement();
+		auto const mag087 = ak087.get_measurement();
+		auto const mag088 = ak088.get_measurement();
+		auto const mag089 = ak089.get_measurement();
+		auto const mag090 = ak090.get_measurement();
+		auto const mag091 = ak091.get_measurement();
+		auto const mag092 = ak092.get_measurement();
+		auto const mag093 = ak093.get_measurement();
+		auto const mag094 = ak094.get_measurement();
+		auto const mag095 = ak095.get_measurement();
+		auto const mag096 = ak096.get_measurement();
+		auto const mag097 = ak097.get_measurement();
+		auto const mag098 = ak098.get_measurement();
+		auto const mag099 = ak099.get_measurement();
+		auto const mag100 = ak100.get_measurement();
+		auto const mag101 = ak101.get_measurement();
+		auto const mag102 = ak102.get_measurement();
+		auto const mag103 = ak103.get_measurement();
+		auto const mag104 = ak104.get_measurement();
+		auto const mag105 = ak105.get_measurement();
+		auto const mag106 = ak106.get_measurement();
+		auto const mag107 = ak107.get_measurement();
+		auto const mag108 = ak108.get_measurement();
+		auto const mag109 = ak109.get_measurement();
+		auto const mag110 = ak110.get_measurement();
+		// clang-format on
+
+		// trigger sensors
+		digitalWrite(PI_7, HIGH);
+		delayMicroseconds(5);  // > 3us
+		digitalWrite(PI_7, LOW);
+		t0 = micros();
+
 		Serial.write(static_cast<std::uint8_t>('M'));
 
 		auto const scale_ak = std::bit_cast<std::array<std::uint8_t, sizeof(AK09940A::get_scale_factor())>>(AK09940A::get_scale_factor());
@@ -675,119 +798,119 @@ void loop() {
 		crc16.add(scale_ak.data(), scale_ak.size());
 
 		// clang-format off
-		auto const mag000 = ak000.get_measurement(); Serial.write(mag000.bytes.data(), mag000.bytes.size()); crc16.add(mag000.bytes.data(), mag000.bytes.size());
-		auto const mag001 = ak001.get_measurement(); Serial.write(mag001.bytes.data(), mag001.bytes.size()); crc16.add(mag001.bytes.data(), mag001.bytes.size());
-		auto const mag002 = ak002.get_measurement(); Serial.write(mag002.bytes.data(), mag002.bytes.size()); crc16.add(mag002.bytes.data(), mag002.bytes.size());
-		auto const mag003 = ak003.get_measurement(); Serial.write(mag003.bytes.data(), mag003.bytes.size()); crc16.add(mag003.bytes.data(), mag003.bytes.size());
-		auto const mag004 = ak004.get_measurement(); Serial.write(mag004.bytes.data(), mag004.bytes.size()); crc16.add(mag004.bytes.data(), mag004.bytes.size());
-		auto const mag005 = ak005.get_measurement(); Serial.write(mag005.bytes.data(), mag005.bytes.size()); crc16.add(mag005.bytes.data(), mag005.bytes.size());
-		auto const mag006 = ak006.get_measurement(); Serial.write(mag006.bytes.data(), mag006.bytes.size()); crc16.add(mag006.bytes.data(), mag006.bytes.size());
-		auto const mag007 = ak007.get_measurement(); Serial.write(mag007.bytes.data(), mag007.bytes.size()); crc16.add(mag007.bytes.data(), mag007.bytes.size());
-		auto const mag008 = ak008.get_measurement(); Serial.write(mag008.bytes.data(), mag008.bytes.size()); crc16.add(mag008.bytes.data(), mag008.bytes.size());
-		auto const mag009 = ak009.get_measurement(); Serial.write(mag009.bytes.data(), mag009.bytes.size()); crc16.add(mag009.bytes.data(), mag009.bytes.size());
-		auto const mag010 = ak010.get_measurement(); Serial.write(mag010.bytes.data(), mag010.bytes.size()); crc16.add(mag010.bytes.data(), mag010.bytes.size());
-		auto const mag011 = ak011.get_measurement(); Serial.write(mag011.bytes.data(), mag011.bytes.size()); crc16.add(mag011.bytes.data(), mag011.bytes.size());
-		auto const mag012 = ak012.get_measurement(); Serial.write(mag012.bytes.data(), mag012.bytes.size()); crc16.add(mag012.bytes.data(), mag012.bytes.size());
-		auto const mag013 = ak013.get_measurement(); Serial.write(mag013.bytes.data(), mag013.bytes.size()); crc16.add(mag013.bytes.data(), mag013.bytes.size());
-		auto const mag014 = ak014.get_measurement(); Serial.write(mag014.bytes.data(), mag014.bytes.size()); crc16.add(mag014.bytes.data(), mag014.bytes.size());
-		auto const mag015 = ak015.get_measurement(); Serial.write(mag015.bytes.data(), mag015.bytes.size()); crc16.add(mag015.bytes.data(), mag015.bytes.size());
-		auto const mag016 = ak016.get_measurement(); Serial.write(mag016.bytes.data(), mag016.bytes.size()); crc16.add(mag016.bytes.data(), mag016.bytes.size());
-		auto const mag017 = ak017.get_measurement(); Serial.write(mag017.bytes.data(), mag017.bytes.size()); crc16.add(mag017.bytes.data(), mag017.bytes.size());
-		auto const mag018 = ak018.get_measurement(); Serial.write(mag018.bytes.data(), mag018.bytes.size()); crc16.add(mag018.bytes.data(), mag018.bytes.size());
-		auto const mag019 = ak019.get_measurement(); Serial.write(mag019.bytes.data(), mag019.bytes.size()); crc16.add(mag019.bytes.data(), mag019.bytes.size());
-		auto const mag020 = ak020.get_measurement(); Serial.write(mag020.bytes.data(), mag020.bytes.size()); crc16.add(mag020.bytes.data(), mag020.bytes.size());
-		auto const mag021 = ak021.get_measurement(); Serial.write(mag021.bytes.data(), mag021.bytes.size()); crc16.add(mag021.bytes.data(), mag021.bytes.size());
-		auto const mag022 = ak022.get_measurement(); Serial.write(mag022.bytes.data(), mag022.bytes.size()); crc16.add(mag022.bytes.data(), mag022.bytes.size());
-		auto const mag023 = ak023.get_measurement(); Serial.write(mag023.bytes.data(), mag023.bytes.size()); crc16.add(mag023.bytes.data(), mag023.bytes.size());
-		auto const mag024 = ak024.get_measurement(); Serial.write(mag024.bytes.data(), mag024.bytes.size()); crc16.add(mag024.bytes.data(), mag024.bytes.size());
-		auto const mag025 = ak025.get_measurement(); Serial.write(mag025.bytes.data(), mag025.bytes.size()); crc16.add(mag025.bytes.data(), mag025.bytes.size());
-		auto const mag026 = ak026.get_measurement(); Serial.write(mag026.bytes.data(), mag026.bytes.size()); crc16.add(mag026.bytes.data(), mag026.bytes.size());
-		auto const mag027 = ak027.get_measurement(); Serial.write(mag027.bytes.data(), mag027.bytes.size()); crc16.add(mag027.bytes.data(), mag027.bytes.size());
-		auto const mag028 = ak028.get_measurement(); Serial.write(mag028.bytes.data(), mag028.bytes.size()); crc16.add(mag028.bytes.data(), mag028.bytes.size());
-		auto const mag029 = ak029.get_measurement(); Serial.write(mag029.bytes.data(), mag029.bytes.size()); crc16.add(mag029.bytes.data(), mag029.bytes.size());
-		auto const mag030 = ak030.get_measurement(); Serial.write(mag030.bytes.data(), mag030.bytes.size()); crc16.add(mag030.bytes.data(), mag030.bytes.size());
-		auto const mag031 = ak031.get_measurement(); Serial.write(mag031.bytes.data(), mag031.bytes.size()); crc16.add(mag031.bytes.data(), mag031.bytes.size());
-		auto const mag032 = ak032.get_measurement(); Serial.write(mag032.bytes.data(), mag032.bytes.size()); crc16.add(mag032.bytes.data(), mag032.bytes.size());
-		auto const mag033 = ak033.get_measurement(); Serial.write(mag033.bytes.data(), mag033.bytes.size()); crc16.add(mag033.bytes.data(), mag033.bytes.size());
+		Serial.write(mag000.bytes.data(), mag000.bytes.size()); crc16.add(mag000.bytes.data(), mag000.bytes.size());
+		Serial.write(mag001.bytes.data(), mag001.bytes.size()); crc16.add(mag001.bytes.data(), mag001.bytes.size());
+		Serial.write(mag002.bytes.data(), mag002.bytes.size()); crc16.add(mag002.bytes.data(), mag002.bytes.size());
+		Serial.write(mag003.bytes.data(), mag003.bytes.size()); crc16.add(mag003.bytes.data(), mag003.bytes.size());
+		Serial.write(mag004.bytes.data(), mag004.bytes.size()); crc16.add(mag004.bytes.data(), mag004.bytes.size());
+		Serial.write(mag005.bytes.data(), mag005.bytes.size()); crc16.add(mag005.bytes.data(), mag005.bytes.size());
+		Serial.write(mag006.bytes.data(), mag006.bytes.size()); crc16.add(mag006.bytes.data(), mag006.bytes.size());
+		Serial.write(mag007.bytes.data(), mag007.bytes.size()); crc16.add(mag007.bytes.data(), mag007.bytes.size());
+		Serial.write(mag008.bytes.data(), mag008.bytes.size()); crc16.add(mag008.bytes.data(), mag008.bytes.size());
+		Serial.write(mag009.bytes.data(), mag009.bytes.size()); crc16.add(mag009.bytes.data(), mag009.bytes.size());
+		Serial.write(mag010.bytes.data(), mag010.bytes.size()); crc16.add(mag010.bytes.data(), mag010.bytes.size());
+		Serial.write(mag011.bytes.data(), mag011.bytes.size()); crc16.add(mag011.bytes.data(), mag011.bytes.size());
+		Serial.write(mag012.bytes.data(), mag012.bytes.size()); crc16.add(mag012.bytes.data(), mag012.bytes.size());
+		Serial.write(mag013.bytes.data(), mag013.bytes.size()); crc16.add(mag013.bytes.data(), mag013.bytes.size());
+		Serial.write(mag014.bytes.data(), mag014.bytes.size()); crc16.add(mag014.bytes.data(), mag014.bytes.size());
+		Serial.write(mag015.bytes.data(), mag015.bytes.size()); crc16.add(mag015.bytes.data(), mag015.bytes.size());
+		Serial.write(mag016.bytes.data(), mag016.bytes.size()); crc16.add(mag016.bytes.data(), mag016.bytes.size());
+		Serial.write(mag017.bytes.data(), mag017.bytes.size()); crc16.add(mag017.bytes.data(), mag017.bytes.size());
+		Serial.write(mag018.bytes.data(), mag018.bytes.size()); crc16.add(mag018.bytes.data(), mag018.bytes.size());
+		Serial.write(mag019.bytes.data(), mag019.bytes.size()); crc16.add(mag019.bytes.data(), mag019.bytes.size());
+		Serial.write(mag020.bytes.data(), mag020.bytes.size()); crc16.add(mag020.bytes.data(), mag020.bytes.size());
+		Serial.write(mag021.bytes.data(), mag021.bytes.size()); crc16.add(mag021.bytes.data(), mag021.bytes.size());
+		Serial.write(mag022.bytes.data(), mag022.bytes.size()); crc16.add(mag022.bytes.data(), mag022.bytes.size());
+		Serial.write(mag023.bytes.data(), mag023.bytes.size()); crc16.add(mag023.bytes.data(), mag023.bytes.size());
+		Serial.write(mag024.bytes.data(), mag024.bytes.size()); crc16.add(mag024.bytes.data(), mag024.bytes.size());
+		Serial.write(mag025.bytes.data(), mag025.bytes.size()); crc16.add(mag025.bytes.data(), mag025.bytes.size());
+		Serial.write(mag026.bytes.data(), mag026.bytes.size()); crc16.add(mag026.bytes.data(), mag026.bytes.size());
+		Serial.write(mag027.bytes.data(), mag027.bytes.size()); crc16.add(mag027.bytes.data(), mag027.bytes.size());
+		Serial.write(mag028.bytes.data(), mag028.bytes.size()); crc16.add(mag028.bytes.data(), mag028.bytes.size());
+		Serial.write(mag029.bytes.data(), mag029.bytes.size()); crc16.add(mag029.bytes.data(), mag029.bytes.size());
+		Serial.write(mag030.bytes.data(), mag030.bytes.size()); crc16.add(mag030.bytes.data(), mag030.bytes.size());
+		Serial.write(mag031.bytes.data(), mag031.bytes.size()); crc16.add(mag031.bytes.data(), mag031.bytes.size());
+		Serial.write(mag032.bytes.data(), mag032.bytes.size()); crc16.add(mag032.bytes.data(), mag032.bytes.size());
+		Serial.write(mag033.bytes.data(), mag033.bytes.size()); crc16.add(mag033.bytes.data(), mag033.bytes.size());
 
-		auto const mag034 = ak034.get_measurement(); Serial.write(mag034.bytes.data(), mag034.bytes.size()); crc16.add(mag034.bytes.data(), mag034.bytes.size());
-		auto const mag035 = ak035.get_measurement(); Serial.write(mag035.bytes.data(), mag035.bytes.size()); crc16.add(mag035.bytes.data(), mag035.bytes.size());
-		auto const mag036 = ak036.get_measurement(); Serial.write(mag036.bytes.data(), mag036.bytes.size()); crc16.add(mag036.bytes.data(), mag036.bytes.size());
-		auto const mag037 = ak037.get_measurement(); Serial.write(mag037.bytes.data(), mag037.bytes.size()); crc16.add(mag037.bytes.data(), mag037.bytes.size());
-		auto const mag038 = ak038.get_measurement(); Serial.write(mag038.bytes.data(), mag038.bytes.size()); crc16.add(mag038.bytes.data(), mag038.bytes.size());
-		auto const mag039 = ak039.get_measurement(); Serial.write(mag039.bytes.data(), mag039.bytes.size()); crc16.add(mag039.bytes.data(), mag039.bytes.size());
-		auto const mag040 = ak040.get_measurement(); Serial.write(mag040.bytes.data(), mag040.bytes.size()); crc16.add(mag040.bytes.data(), mag040.bytes.size());
-		auto const mag041 = ak041.get_measurement(); Serial.write(mag041.bytes.data(), mag041.bytes.size()); crc16.add(mag041.bytes.data(), mag041.bytes.size());
-		auto const mag042 = ak042.get_measurement(); Serial.write(mag042.bytes.data(), mag042.bytes.size()); crc16.add(mag042.bytes.data(), mag042.bytes.size());
-		auto const mag043 = ak043.get_measurement(); Serial.write(mag043.bytes.data(), mag043.bytes.size()); crc16.add(mag043.bytes.data(), mag043.bytes.size());
-		auto const mag044 = ak044.get_measurement(); Serial.write(mag044.bytes.data(), mag044.bytes.size()); crc16.add(mag044.bytes.data(), mag044.bytes.size());
-		auto const mag045 = ak045.get_measurement(); Serial.write(mag045.bytes.data(), mag045.bytes.size()); crc16.add(mag045.bytes.data(), mag045.bytes.size());
-		auto const mag046 = ak046.get_measurement(); Serial.write(mag046.bytes.data(), mag046.bytes.size()); crc16.add(mag046.bytes.data(), mag046.bytes.size());
-		auto const mag047 = ak047.get_measurement(); Serial.write(mag047.bytes.data(), mag047.bytes.size()); crc16.add(mag047.bytes.data(), mag047.bytes.size());
-		auto const mag048 = ak048.get_measurement(); Serial.write(mag048.bytes.data(), mag048.bytes.size()); crc16.add(mag048.bytes.data(), mag048.bytes.size());
-		auto const mag049 = ak049.get_measurement(); Serial.write(mag049.bytes.data(), mag049.bytes.size()); crc16.add(mag049.bytes.data(), mag049.bytes.size());
-		auto const mag050 = ak050.get_measurement(); Serial.write(mag050.bytes.data(), mag050.bytes.size()); crc16.add(mag050.bytes.data(), mag050.bytes.size());
-		auto const mag051 = ak051.get_measurement(); Serial.write(mag051.bytes.data(), mag051.bytes.size()); crc16.add(mag051.bytes.data(), mag051.bytes.size());
-		auto const mag052 = ak052.get_measurement(); Serial.write(mag052.bytes.data(), mag052.bytes.size()); crc16.add(mag052.bytes.data(), mag052.bytes.size());
-		auto const mag053 = ak053.get_measurement(); Serial.write(mag053.bytes.data(), mag053.bytes.size()); crc16.add(mag053.bytes.data(), mag053.bytes.size());
-		auto const mag054 = ak054.get_measurement(); Serial.write(mag054.bytes.data(), mag054.bytes.size()); crc16.add(mag054.bytes.data(), mag054.bytes.size());
-		auto const mag055 = ak055.get_measurement(); Serial.write(mag055.bytes.data(), mag055.bytes.size()); crc16.add(mag055.bytes.data(), mag055.bytes.size());
-		auto const mag056 = ak056.get_measurement(); Serial.write(mag056.bytes.data(), mag056.bytes.size()); crc16.add(mag056.bytes.data(), mag056.bytes.size());
-		auto const mag057 = ak057.get_measurement(); Serial.write(mag057.bytes.data(), mag057.bytes.size()); crc16.add(mag057.bytes.data(), mag057.bytes.size());
-		auto const mag058 = ak058.get_measurement(); Serial.write(mag058.bytes.data(), mag058.bytes.size()); crc16.add(mag058.bytes.data(), mag058.bytes.size());
-		auto const mag059 = ak059.get_measurement(); Serial.write(mag059.bytes.data(), mag059.bytes.size()); crc16.add(mag059.bytes.data(), mag059.bytes.size());
-		auto const mag060 = ak060.get_measurement(); Serial.write(mag060.bytes.data(), mag060.bytes.size()); crc16.add(mag060.bytes.data(), mag060.bytes.size());
-		auto const mag061 = ak061.get_measurement(); Serial.write(mag061.bytes.data(), mag061.bytes.size()); crc16.add(mag061.bytes.data(), mag061.bytes.size());
-		auto const mag062 = ak062.get_measurement(); Serial.write(mag062.bytes.data(), mag062.bytes.size()); crc16.add(mag062.bytes.data(), mag062.bytes.size());
-		auto const mag063 = ak063.get_measurement(); Serial.write(mag063.bytes.data(), mag063.bytes.size()); crc16.add(mag063.bytes.data(), mag063.bytes.size());
-		auto const mag064 = ak064.get_measurement(); Serial.write(mag064.bytes.data(), mag064.bytes.size()); crc16.add(mag064.bytes.data(), mag064.bytes.size());
-		auto const mag065 = ak065.get_measurement(); Serial.write(mag065.bytes.data(), mag065.bytes.size()); crc16.add(mag065.bytes.data(), mag065.bytes.size());
-		auto const mag066 = ak066.get_measurement(); Serial.write(mag066.bytes.data(), mag066.bytes.size()); crc16.add(mag066.bytes.data(), mag066.bytes.size());
-		auto const mag067 = ak067.get_measurement(); Serial.write(mag067.bytes.data(), mag067.bytes.size()); crc16.add(mag067.bytes.data(), mag067.bytes.size());
-		auto const mag068 = ak068.get_measurement(); Serial.write(mag068.bytes.data(), mag068.bytes.size()); crc16.add(mag068.bytes.data(), mag068.bytes.size());
-		auto const mag069 = ak069.get_measurement(); Serial.write(mag069.bytes.data(), mag069.bytes.size()); crc16.add(mag069.bytes.data(), mag069.bytes.size());
-		auto const mag070 = ak070.get_measurement(); Serial.write(mag070.bytes.data(), mag070.bytes.size()); crc16.add(mag070.bytes.data(), mag070.bytes.size());
-		auto const mag071 = ak071.get_measurement(); Serial.write(mag071.bytes.data(), mag071.bytes.size()); crc16.add(mag071.bytes.data(), mag071.bytes.size());
-		auto const mag072 = ak072.get_measurement(); Serial.write(mag072.bytes.data(), mag072.bytes.size()); crc16.add(mag072.bytes.data(), mag072.bytes.size());
-		auto const mag073 = ak073.get_measurement(); Serial.write(mag073.bytes.data(), mag073.bytes.size()); crc16.add(mag073.bytes.data(), mag073.bytes.size());
-		auto const mag074 = ak074.get_measurement(); Serial.write(mag074.bytes.data(), mag074.bytes.size()); crc16.add(mag074.bytes.data(), mag074.bytes.size());
-		auto const mag075 = ak075.get_measurement(); Serial.write(mag075.bytes.data(), mag075.bytes.size()); crc16.add(mag075.bytes.data(), mag075.bytes.size());
-		auto const mag076 = ak076.get_measurement(); Serial.write(mag076.bytes.data(), mag076.bytes.size()); crc16.add(mag076.bytes.data(), mag076.bytes.size());
+		Serial.write(mag034.bytes.data(), mag034.bytes.size()); crc16.add(mag034.bytes.data(), mag034.bytes.size());
+		Serial.write(mag035.bytes.data(), mag035.bytes.size()); crc16.add(mag035.bytes.data(), mag035.bytes.size());
+		Serial.write(mag036.bytes.data(), mag036.bytes.size()); crc16.add(mag036.bytes.data(), mag036.bytes.size());
+		Serial.write(mag037.bytes.data(), mag037.bytes.size()); crc16.add(mag037.bytes.data(), mag037.bytes.size());
+		Serial.write(mag038.bytes.data(), mag038.bytes.size()); crc16.add(mag038.bytes.data(), mag038.bytes.size());
+		Serial.write(mag039.bytes.data(), mag039.bytes.size()); crc16.add(mag039.bytes.data(), mag039.bytes.size());
+		Serial.write(mag040.bytes.data(), mag040.bytes.size()); crc16.add(mag040.bytes.data(), mag040.bytes.size());
+		Serial.write(mag041.bytes.data(), mag041.bytes.size()); crc16.add(mag041.bytes.data(), mag041.bytes.size());
+		Serial.write(mag042.bytes.data(), mag042.bytes.size()); crc16.add(mag042.bytes.data(), mag042.bytes.size());
+		Serial.write(mag043.bytes.data(), mag043.bytes.size()); crc16.add(mag043.bytes.data(), mag043.bytes.size());
+		Serial.write(mag044.bytes.data(), mag044.bytes.size()); crc16.add(mag044.bytes.data(), mag044.bytes.size());
+		Serial.write(mag045.bytes.data(), mag045.bytes.size()); crc16.add(mag045.bytes.data(), mag045.bytes.size());
+		Serial.write(mag046.bytes.data(), mag046.bytes.size()); crc16.add(mag046.bytes.data(), mag046.bytes.size());
+		Serial.write(mag047.bytes.data(), mag047.bytes.size()); crc16.add(mag047.bytes.data(), mag047.bytes.size());
+		Serial.write(mag048.bytes.data(), mag048.bytes.size()); crc16.add(mag048.bytes.data(), mag048.bytes.size());
+		Serial.write(mag049.bytes.data(), mag049.bytes.size()); crc16.add(mag049.bytes.data(), mag049.bytes.size());
+		Serial.write(mag050.bytes.data(), mag050.bytes.size()); crc16.add(mag050.bytes.data(), mag050.bytes.size());
+		Serial.write(mag051.bytes.data(), mag051.bytes.size()); crc16.add(mag051.bytes.data(), mag051.bytes.size());
+		Serial.write(mag052.bytes.data(), mag052.bytes.size()); crc16.add(mag052.bytes.data(), mag052.bytes.size());
+		Serial.write(mag053.bytes.data(), mag053.bytes.size()); crc16.add(mag053.bytes.data(), mag053.bytes.size());
+		Serial.write(mag054.bytes.data(), mag054.bytes.size()); crc16.add(mag054.bytes.data(), mag054.bytes.size());
+		Serial.write(mag055.bytes.data(), mag055.bytes.size()); crc16.add(mag055.bytes.data(), mag055.bytes.size());
+		Serial.write(mag056.bytes.data(), mag056.bytes.size()); crc16.add(mag056.bytes.data(), mag056.bytes.size());
+		Serial.write(mag057.bytes.data(), mag057.bytes.size()); crc16.add(mag057.bytes.data(), mag057.bytes.size());
+		Serial.write(mag058.bytes.data(), mag058.bytes.size()); crc16.add(mag058.bytes.data(), mag058.bytes.size());
+		Serial.write(mag059.bytes.data(), mag059.bytes.size()); crc16.add(mag059.bytes.data(), mag059.bytes.size());
+		Serial.write(mag060.bytes.data(), mag060.bytes.size()); crc16.add(mag060.bytes.data(), mag060.bytes.size());
+		Serial.write(mag061.bytes.data(), mag061.bytes.size()); crc16.add(mag061.bytes.data(), mag061.bytes.size());
+		Serial.write(mag062.bytes.data(), mag062.bytes.size()); crc16.add(mag062.bytes.data(), mag062.bytes.size());
+		Serial.write(mag063.bytes.data(), mag063.bytes.size()); crc16.add(mag063.bytes.data(), mag063.bytes.size());
+		Serial.write(mag064.bytes.data(), mag064.bytes.size()); crc16.add(mag064.bytes.data(), mag064.bytes.size());
+		Serial.write(mag065.bytes.data(), mag065.bytes.size()); crc16.add(mag065.bytes.data(), mag065.bytes.size());
+		Serial.write(mag066.bytes.data(), mag066.bytes.size()); crc16.add(mag066.bytes.data(), mag066.bytes.size());
+		Serial.write(mag067.bytes.data(), mag067.bytes.size()); crc16.add(mag067.bytes.data(), mag067.bytes.size());
+		Serial.write(mag068.bytes.data(), mag068.bytes.size()); crc16.add(mag068.bytes.data(), mag068.bytes.size());
+		Serial.write(mag069.bytes.data(), mag069.bytes.size()); crc16.add(mag069.bytes.data(), mag069.bytes.size());
+		Serial.write(mag070.bytes.data(), mag070.bytes.size()); crc16.add(mag070.bytes.data(), mag070.bytes.size());
+		Serial.write(mag071.bytes.data(), mag071.bytes.size()); crc16.add(mag071.bytes.data(), mag071.bytes.size());
+		Serial.write(mag072.bytes.data(), mag072.bytes.size()); crc16.add(mag072.bytes.data(), mag072.bytes.size());
+		Serial.write(mag073.bytes.data(), mag073.bytes.size()); crc16.add(mag073.bytes.data(), mag073.bytes.size());
+		Serial.write(mag074.bytes.data(), mag074.bytes.size()); crc16.add(mag074.bytes.data(), mag074.bytes.size());
+		Serial.write(mag075.bytes.data(), mag075.bytes.size()); crc16.add(mag075.bytes.data(), mag075.bytes.size());
+		Serial.write(mag076.bytes.data(), mag076.bytes.size()); crc16.add(mag076.bytes.data(), mag076.bytes.size());
 
-		auto const mag077 = ak077.get_measurement(); Serial.write(mag077.bytes.data(), mag077.bytes.size()); crc16.add(mag077.bytes.data(), mag077.bytes.size());
-		auto const mag078 = ak078.get_measurement(); Serial.write(mag078.bytes.data(), mag078.bytes.size()); crc16.add(mag078.bytes.data(), mag078.bytes.size());
-		auto const mag079 = ak079.get_measurement(); Serial.write(mag079.bytes.data(), mag079.bytes.size()); crc16.add(mag079.bytes.data(), mag079.bytes.size());
-		auto const mag080 = ak080.get_measurement(); Serial.write(mag080.bytes.data(), mag080.bytes.size()); crc16.add(mag080.bytes.data(), mag080.bytes.size());
-		auto const mag081 = ak081.get_measurement(); Serial.write(mag081.bytes.data(), mag081.bytes.size()); crc16.add(mag081.bytes.data(), mag081.bytes.size());
-		auto const mag082 = ak082.get_measurement(); Serial.write(mag082.bytes.data(), mag082.bytes.size()); crc16.add(mag082.bytes.data(), mag082.bytes.size());
-		auto const mag083 = ak083.get_measurement(); Serial.write(mag083.bytes.data(), mag083.bytes.size()); crc16.add(mag083.bytes.data(), mag083.bytes.size());
-		auto const mag084 = ak084.get_measurement(); Serial.write(mag084.bytes.data(), mag084.bytes.size()); crc16.add(mag084.bytes.data(), mag084.bytes.size());
-		auto const mag085 = ak085.get_measurement(); Serial.write(mag085.bytes.data(), mag085.bytes.size()); crc16.add(mag085.bytes.data(), mag085.bytes.size());
-		auto const mag086 = ak086.get_measurement(); Serial.write(mag086.bytes.data(), mag086.bytes.size()); crc16.add(mag086.bytes.data(), mag086.bytes.size());
-		auto const mag087 = ak087.get_measurement(); Serial.write(mag087.bytes.data(), mag087.bytes.size()); crc16.add(mag087.bytes.data(), mag087.bytes.size());
-		auto const mag088 = ak088.get_measurement(); Serial.write(mag088.bytes.data(), mag088.bytes.size()); crc16.add(mag088.bytes.data(), mag088.bytes.size());
-		auto const mag089 = ak089.get_measurement(); Serial.write(mag089.bytes.data(), mag089.bytes.size()); crc16.add(mag089.bytes.data(), mag089.bytes.size());
-		auto const mag090 = ak090.get_measurement(); Serial.write(mag090.bytes.data(), mag090.bytes.size()); crc16.add(mag090.bytes.data(), mag090.bytes.size());
-		auto const mag091 = ak091.get_measurement(); Serial.write(mag091.bytes.data(), mag091.bytes.size()); crc16.add(mag091.bytes.data(), mag091.bytes.size());
-		auto const mag092 = ak092.get_measurement(); Serial.write(mag092.bytes.data(), mag092.bytes.size()); crc16.add(mag092.bytes.data(), mag092.bytes.size());
-		auto const mag093 = ak093.get_measurement(); Serial.write(mag093.bytes.data(), mag093.bytes.size()); crc16.add(mag093.bytes.data(), mag093.bytes.size());
-		auto const mag094 = ak094.get_measurement(); Serial.write(mag094.bytes.data(), mag094.bytes.size()); crc16.add(mag094.bytes.data(), mag094.bytes.size());
-		auto const mag095 = ak095.get_measurement(); Serial.write(mag095.bytes.data(), mag095.bytes.size()); crc16.add(mag095.bytes.data(), mag095.bytes.size());
-		auto const mag096 = ak096.get_measurement(); Serial.write(mag096.bytes.data(), mag096.bytes.size()); crc16.add(mag096.bytes.data(), mag096.bytes.size());
-		auto const mag097 = ak097.get_measurement(); Serial.write(mag097.bytes.data(), mag097.bytes.size()); crc16.add(mag097.bytes.data(), mag097.bytes.size());
-		auto const mag098 = ak098.get_measurement(); Serial.write(mag098.bytes.data(), mag098.bytes.size()); crc16.add(mag098.bytes.data(), mag098.bytes.size());
-		auto const mag099 = ak099.get_measurement(); Serial.write(mag099.bytes.data(), mag099.bytes.size()); crc16.add(mag099.bytes.data(), mag099.bytes.size());
-		auto const mag100 = ak100.get_measurement(); Serial.write(mag100.bytes.data(), mag100.bytes.size()); crc16.add(mag100.bytes.data(), mag100.bytes.size());
-		auto const mag101 = ak101.get_measurement(); Serial.write(mag101.bytes.data(), mag101.bytes.size()); crc16.add(mag101.bytes.data(), mag101.bytes.size());
-		auto const mag102 = ak102.get_measurement(); Serial.write(mag102.bytes.data(), mag102.bytes.size()); crc16.add(mag102.bytes.data(), mag102.bytes.size());
-		auto const mag103 = ak103.get_measurement(); Serial.write(mag103.bytes.data(), mag103.bytes.size()); crc16.add(mag103.bytes.data(), mag103.bytes.size());
-		auto const mag104 = ak104.get_measurement(); Serial.write(mag104.bytes.data(), mag104.bytes.size()); crc16.add(mag104.bytes.data(), mag104.bytes.size());
-		auto const mag105 = ak105.get_measurement(); Serial.write(mag105.bytes.data(), mag105.bytes.size()); crc16.add(mag105.bytes.data(), mag105.bytes.size());
-		auto const mag106 = ak106.get_measurement(); Serial.write(mag106.bytes.data(), mag106.bytes.size()); crc16.add(mag106.bytes.data(), mag106.bytes.size());
-		auto const mag107 = ak107.get_measurement(); Serial.write(mag107.bytes.data(), mag107.bytes.size()); crc16.add(mag107.bytes.data(), mag107.bytes.size());
-		auto const mag108 = ak108.get_measurement(); Serial.write(mag108.bytes.data(), mag108.bytes.size()); crc16.add(mag108.bytes.data(), mag108.bytes.size());
-		auto const mag109 = ak109.get_measurement(); Serial.write(mag109.bytes.data(), mag109.bytes.size()); crc16.add(mag109.bytes.data(), mag109.bytes.size());
-		auto const mag110 = ak110.get_measurement(); Serial.write(mag110.bytes.data(), mag110.bytes.size()); crc16.add(mag110.bytes.data(), mag110.bytes.size());
+		Serial.write(mag077.bytes.data(), mag077.bytes.size()); crc16.add(mag077.bytes.data(), mag077.bytes.size());
+		Serial.write(mag078.bytes.data(), mag078.bytes.size()); crc16.add(mag078.bytes.data(), mag078.bytes.size());
+		Serial.write(mag079.bytes.data(), mag079.bytes.size()); crc16.add(mag079.bytes.data(), mag079.bytes.size());
+		Serial.write(mag080.bytes.data(), mag080.bytes.size()); crc16.add(mag080.bytes.data(), mag080.bytes.size());
+		Serial.write(mag081.bytes.data(), mag081.bytes.size()); crc16.add(mag081.bytes.data(), mag081.bytes.size());
+		Serial.write(mag082.bytes.data(), mag082.bytes.size()); crc16.add(mag082.bytes.data(), mag082.bytes.size());
+		Serial.write(mag083.bytes.data(), mag083.bytes.size()); crc16.add(mag083.bytes.data(), mag083.bytes.size());
+		Serial.write(mag084.bytes.data(), mag084.bytes.size()); crc16.add(mag084.bytes.data(), mag084.bytes.size());
+		Serial.write(mag085.bytes.data(), mag085.bytes.size()); crc16.add(mag085.bytes.data(), mag085.bytes.size());
+		Serial.write(mag086.bytes.data(), mag086.bytes.size()); crc16.add(mag086.bytes.data(), mag086.bytes.size());
+		Serial.write(mag087.bytes.data(), mag087.bytes.size()); crc16.add(mag087.bytes.data(), mag087.bytes.size());
+		Serial.write(mag088.bytes.data(), mag088.bytes.size()); crc16.add(mag088.bytes.data(), mag088.bytes.size());
+		Serial.write(mag089.bytes.data(), mag089.bytes.size()); crc16.add(mag089.bytes.data(), mag089.bytes.size());
+		Serial.write(mag090.bytes.data(), mag090.bytes.size()); crc16.add(mag090.bytes.data(), mag090.bytes.size());
+		Serial.write(mag091.bytes.data(), mag091.bytes.size()); crc16.add(mag091.bytes.data(), mag091.bytes.size());
+		Serial.write(mag092.bytes.data(), mag092.bytes.size()); crc16.add(mag092.bytes.data(), mag092.bytes.size());
+		Serial.write(mag093.bytes.data(), mag093.bytes.size()); crc16.add(mag093.bytes.data(), mag093.bytes.size());
+		Serial.write(mag094.bytes.data(), mag094.bytes.size()); crc16.add(mag094.bytes.data(), mag094.bytes.size());
+		Serial.write(mag095.bytes.data(), mag095.bytes.size()); crc16.add(mag095.bytes.data(), mag095.bytes.size());
+		Serial.write(mag096.bytes.data(), mag096.bytes.size()); crc16.add(mag096.bytes.data(), mag096.bytes.size());
+		Serial.write(mag097.bytes.data(), mag097.bytes.size()); crc16.add(mag097.bytes.data(), mag097.bytes.size());
+		Serial.write(mag098.bytes.data(), mag098.bytes.size()); crc16.add(mag098.bytes.data(), mag098.bytes.size());
+		Serial.write(mag099.bytes.data(), mag099.bytes.size()); crc16.add(mag099.bytes.data(), mag099.bytes.size());
+		Serial.write(mag100.bytes.data(), mag100.bytes.size()); crc16.add(mag100.bytes.data(), mag100.bytes.size());
+		Serial.write(mag101.bytes.data(), mag101.bytes.size()); crc16.add(mag101.bytes.data(), mag101.bytes.size());
+		Serial.write(mag102.bytes.data(), mag102.bytes.size()); crc16.add(mag102.bytes.data(), mag102.bytes.size());
+		Serial.write(mag103.bytes.data(), mag103.bytes.size()); crc16.add(mag103.bytes.data(), mag103.bytes.size());
+		Serial.write(mag104.bytes.data(), mag104.bytes.size()); crc16.add(mag104.bytes.data(), mag104.bytes.size());
+		Serial.write(mag105.bytes.data(), mag105.bytes.size()); crc16.add(mag105.bytes.data(), mag105.bytes.size());
+		Serial.write(mag106.bytes.data(), mag106.bytes.size()); crc16.add(mag106.bytes.data(), mag106.bytes.size());
+		Serial.write(mag107.bytes.data(), mag107.bytes.size()); crc16.add(mag107.bytes.data(), mag107.bytes.size());
+		Serial.write(mag108.bytes.data(), mag108.bytes.size()); crc16.add(mag108.bytes.data(), mag108.bytes.size());
+		Serial.write(mag109.bytes.data(), mag109.bytes.size()); crc16.add(mag109.bytes.data(), mag109.bytes.size());
+		Serial.write(mag110.bytes.data(), mag110.bytes.size()); crc16.add(mag110.bytes.data(), mag110.bytes.size());
 		// clang-format on
 
 		auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
