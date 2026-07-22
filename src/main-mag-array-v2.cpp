@@ -541,7 +541,7 @@ void loop() {
 		// std::tie(time_delay, time_offset) = common::sync_time();
 		if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
 			common2::message("micros overflow detected!");
-			delayMicroseconds(3100);
+			delayMicroseconds(3500);
 			return;
 		}
 	}
@@ -551,8 +551,8 @@ void loop() {
 	}
 
 	{  // poll AK09940A
-		if (auto t1 = micros(); t1 - t0 < 3100) {
-			delayMicroseconds(3100 - (t1 - t0));  // > 3.1ms
+		if (auto t1 = micros(); t1 - t0 < 3500) {
+			delayMicroseconds(3500 - (t1 - t0));  // > 3.1ms
 		}
 
 		/*ak000.start_measurement();
@@ -787,7 +787,7 @@ void loop() {
 
 		// trigger sensors
 		digitalWrite(PI_7, HIGH);
-		delayMicroseconds(5);  // > 3us
+		delayMicroseconds(10);  // > 3us
 		digitalWrite(PI_7, LOW);
 		t0 = micros();
 
