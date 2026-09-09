@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <H7Adc.h>
 #include <MCP9700B.h>
 #include <SPI.h>
 
@@ -9,24 +10,27 @@ static bool led_state = LOW;
 // Device-register view of the OTG_FS core (frame number lives in DSTS).
 #define OTG_FS_DEV ((USB_OTG_DeviceTypeDef*)((uint32_t)USB_OTG_FS + USB_OTG_DEVICE_BASE))
 
-// One MCP9700B per temperature channel. VERIFY each pin against your nets;
-// PC2/PC3 are the _C direct pads, PB2 has no ADC (don't use it here).
-static MCP9700B temp1(PA_0);
-static MCP9700B temp2(PC_0);
-static MCP9700B temp3(PC_1);
-static MCP9700B temp4(PC_2_C);
-static MCP9700B temp5(PC_3_C);
-static MCP9700B temp6(PA_3);
-static MCP9700B temp7(PA_2);
-static MCP9700B temp8(PA_1);
-static MCP9700B temp9(PA_4);
-static MCP9700B temp10(PA_6);
-static MCP9700B temp11(PA_5);
-static MCP9700B temp12(PA_7);
-static MCP9700B temp13(PC_4);
-static MCP9700B temp14(PC_5);
-static MCP9700B temp15(PB_0);
-static MCP9700B temp16(PB_1);
+// One ADC driver each. adc1: PA/PC/PB channels. adc3: the PC2_C/PC3_C pads.
+static H7Adc adc1(ADC1);
+static H7Adc adc3(ADC3);
+
+// One MCP9700B per temperature channel: (its H7Adc, channel). Comments show the pin.
+static MCP9700B temp1(adc1, ADC_CHANNEL_16);   // PA0
+static MCP9700B temp2(adc1, ADC_CHANNEL_10);   // PC0
+static MCP9700B temp3(adc1, ADC_CHANNEL_11);   // PC1
+static MCP9700B temp4(adc3, ADC_CHANNEL_0);    // PC2_C
+static MCP9700B temp5(adc3, ADC_CHANNEL_1);    // PC3_C
+static MCP9700B temp6(adc1, ADC_CHANNEL_15);   // PA3
+static MCP9700B temp7(adc1, ADC_CHANNEL_14);   // PA2
+static MCP9700B temp8(adc1, ADC_CHANNEL_17);   // PA1
+static MCP9700B temp9(adc1, ADC_CHANNEL_18);   // PA4
+static MCP9700B temp10(adc1, ADC_CHANNEL_3);   // PA6
+static MCP9700B temp11(adc1, ADC_CHANNEL_19);  // PA5
+static MCP9700B temp12(adc1, ADC_CHANNEL_7);   // PA7
+static MCP9700B temp13(adc1, ADC_CHANNEL_4);   // PC4
+static MCP9700B temp14(adc1, ADC_CHANNEL_8);   // PC5
+static MCP9700B temp15(adc1, ADC_CHANNEL_9);   // PB0
+static MCP9700B temp16(adc1, ADC_CHANNEL_5);   // PB1
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -168,23 +172,8 @@ void setup() {
 	sof_timer_init();   // SOF fills TIM5 (÷2 for the doublet) → CNT = ms
 	sof_timer_check();  // verify CNT advances 1:1 with the DSTS frame
 
-	// configure all temperature ADC pins
-	temp1.begin();
-	temp2.begin();
-	temp3.begin();
-	temp4.begin();
-	temp5.begin();
-	temp6.begin();
-	temp7.begin();
-	temp8.begin();
-	temp9.begin();
-	temp10.begin();
-	temp11.begin();
-	temp12.begin();
-	temp13.begin();
-	temp14.begin();
-	temp15.begin();
-	temp16.begin();
+	adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels)
+	adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads)
 }
 
 void loop() {
