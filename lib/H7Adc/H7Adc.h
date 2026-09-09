@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <common2_output.h>
 
 #include <cstdint>
 
@@ -18,11 +19,16 @@ class H7Adc {
    public:
 	explicit H7Adc(ADC_TypeDef* const inst) : inst_(inst) {}
 
-	// Configure the ADC kernel clock, enable + calibrate this ADC. Call once.
+	// True once begin() has initialised + calibrated the ADC successfully.
+	[[nodiscard]] bool is_initialized() const { return initialized; }
+
+	// Configure the ADC kernel clock, enable + calibrate this ADC (logs each
+	// step, AK-style). Call once. Sets is_initialized() only if HAL succeeds.
 	void begin() {
 		// Make sure HSI is running — we clock the ADC from it (independent of the
 		// HSE/PLL sysclk tree, so it is always available). Does not disturb sysclk.
 		// Both are global/idempotent, so it is fine if several H7Adc call begin().
+		common2::print_time_loc(millis(), '\'', name(), '\'', " configure kernel clock...");
 		RCC_OscInitTypeDef osc = {};
 		osc.OscillatorType = RCC_OSCILLATORTYPE_HSI;
 		osc.HSIState = RCC_HSI_ON;
@@ -41,6 +47,7 @@ class H7Adc {
 		} else {
 			__HAL_RCC_ADC12_CLK_ENABLE();
 		}
+		common2::println("Done!");
 
 		h_.Instance = inst_;
 		h_.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;  // slow & safe (temperature doesn't need speed)
@@ -56,8 +63,27 @@ class H7Adc {
 		h_.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DR;
 		h_.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
 		h_.Init.OversamplingMode = DISABLE;
-		HAL_ADC_Init(&h_);
-		HAL_ADCEx_Calibration_Start(&h_, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+
+		// init
+		common2::print_time_loc(millis(), '\'', name(), '\'', " init...");
+		if (HAL_ADC_Init(&h_) != HAL_OK) {
+			common2::println("Abort!");
+			initialized = false;
+			return;
+		}
+		common2::println("Done!");
+
+		// calibrate (offset, single-ended)
+		common2::print_time_loc(millis(), '\'', name(), '\'', " calibrate...");
+		if (HAL_ADCEx_Calibration_Start(&h_, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
+			common2::println("Abort!");
+			initialized = false;
+			return;
+		}
+		common2::println("Done!");
+
+		initialized = true;
+		common2::println_time_loc(millis(), '\'', name(), '\'', " Ready!");
 	}
 
 	// Single 12-bit conversion on `channel` (an ADC_CHANNEL_x macro).
@@ -79,6 +105,15 @@ class H7Adc {
 	}
 
    private:
+	// Human-readable label for the boot log, derived from the peripheral.
+	[[nodiscard]] const char* name() const {
+		if (inst_ == ADC1) return "ADC1";
+		if (inst_ == ADC2) return "ADC2";
+		if (inst_ == ADC3) return "ADC3";
+		return "ADC?";
+	}
+
 	ADC_TypeDef* inst_;
 	ADC_HandleTypeDef h_{};
+	bool initialized = false;  // set by begin() once init + calibration succeed
 };

@@ -1,5 +1,8 @@
+#include <ADS131E08.h>
 #include <Arduino.h>
+#include <FLC100.h>
 #include <H7Adc.h>
+#include <HalSpi4.h>
 #include <MCP9700B.h>
 #include <SPI.h>
 
@@ -31,6 +34,38 @@ static MCP9700B temp13(adc1, ADC_CHANNEL_4);   // PC4
 static MCP9700B temp14(adc1, ADC_CHANNEL_8);   // PC5
 static MCP9700B temp15(adc1, ADC_CHANNEL_9);   // PB0
 static MCP9700B temp16(adc1, ADC_CHANNEL_5);   // PB1
+
+// --- Magnetometers: TWO daisy-chained ADS131E08 (16 channels) on SPI4 ---
+// SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
+static HalSpi4 spi4;  // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
+static ADS131E08 mag_adc(spi4, PE_4, PE_3, PE_14, PB_10, PB_11);  // (spi, CS, DRDY, START=PE14, nRESET0=PB10, nRESET1=PB11), VREF=4.096 V
+
+// One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
+// ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
+static FLC100 mag1(mag_adc, 0);
+static FLC100 mag2(mag_adc, 1);
+static FLC100 mag3(mag_adc, 2);
+static FLC100 mag4(mag_adc, 3);
+static FLC100 mag5(mag_adc, 4);
+static FLC100 mag6(mag_adc, 5);
+static FLC100 mag7(mag_adc, 6);
+static FLC100 mag8(mag_adc, 7);
+static FLC100 mag9(mag_adc, 8);
+static FLC100 mag10(mag_adc, 9);
+static FLC100 mag11(mag_adc, 10);
+static FLC100 mag12(mag_adc, 11);
+static FLC100 mag13(mag_adc, 12);
+static FLC100 mag14(mag_adc, 13);
+static FLC100 mag15(mag_adc, 14);
+static FLC100 mag16(mag_adc, 15);
+
+// Wait (briefly) for a fresh conversion, then latch one full frame.
+static void mag_read_frame() {
+	std::uint32_t const t0 = micros();
+	while (!mag_adc.data_ready() && micros() - t0 < 5000) {
+	}  // wait up to 5 ms for DRDY (1 kSPS → new frame every ~1 ms)
+	mag_adc.read();
+}
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -99,8 +134,8 @@ static void sof_timer_init() {
 	TIM5->ARR = 0xFFFFFFFF;  // full 32-bit range
 	TIM5->CNT = 0;
 
-	TIM5->SMCR = TIM_SMCR_TS_3 | TIM_SMCR_TS_2                  // TS  = 0b01100 = ITR8 (USB2 OTG_FS SOF)
-	           | TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1 | TIM_SMCR_SMS_0;  // SMS = external clock mode 1
+	TIM5->SMCR = TIM_SMCR_TS_3 | TIM_SMCR_TS_2                        // TS  = 0b01100 = ITR8 (USB2 OTG_FS SOF)
+	             | TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1 | TIM_SMCR_SMS_0;  // SMS = external clock mode 1
 
 	TIM5->EGR = TIM_EGR_UG;
 	TIM5->CR1 |= TIM_CR1_CEN;
@@ -145,7 +180,8 @@ static void sof_timer_check() {
 	std::uint32_t prev = TIM5->CCR1;
 	for (int i = 0; i < 40; ++i) {
 		std::uint32_t g = 0;
-		while (TIM5->CCR1 == prev && ++g < 50000000u) {}  // wait for the next capture
+		while (TIM5->CCR1 == prev && ++g < 50000000u) {
+		}  // wait for the next capture
 		std::uint32_t const cur = TIM5->CCR1;
 		char m[40];
 		snprintf(m, sizeof(m), "%lu\n", static_cast<unsigned long>(cur - prev));
@@ -166,26 +202,81 @@ void setup() {
 		while (!Serial) {
 		}  // wait for enumeration → USB SOFs are now flowing
 		Serial.println("Hello over USB");
+		Serial.println("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
 	}
 
 	// sof_interval_dump();  // DIAGNOSTIC (confirmed a steady doublet → PSC=1)
 	sof_timer_init();   // SOF fills TIM5 (÷2 for the doublet) → CNT = ms
 	sof_timer_check();  // verify CNT advances 1:1 with the DSTS frame
 
-	adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels)
-	adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads)
+	adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
+	adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
+
+	spi4.begin();  // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
+
+	{  // TEMP DIAGNOSTIC: confirm SPI4 is now configured (CFG2 MASTER set) and a byte clocks.
+		char d[160];
+		snprintf(d, sizeof(d), "SPI4 CR1=%08lX CFG1=%08lX CFG2=%08lX CR2=%08lX SR=%08lX\n",
+		    static_cast<unsigned long>(SPI4->CR1), static_cast<unsigned long>(SPI4->CFG1),
+		    static_cast<unsigned long>(SPI4->CFG2), static_cast<unsigned long>(SPI4->CR2),
+		    static_cast<unsigned long>(SPI4->SR));
+		Serial.print(d);
+		std::uint8_t const r = spi4.transfer(0x00);
+		snprintf(d, sizeof(d), "probe: transfer returned 0x%02X\n", r);
+		Serial.print(d);
+		Serial.flush();
+	}
+
+	mag_adc.begin();          // configure + ID/register self-test (logs each step)
+
+	{  // DRDY diagnostic: is the ADC actually converting? DRDY should pulse low at
+		// the data rate. If it NEVER goes low, there are no conversions → the ADS
+		// has no conversion clock (external CLK pin / CLKSEL), which also explains
+		// all-zero codes even though SPI register I/O works.
+		mag_adc.start();
+		std::uint32_t lows = 0, polls = 0;
+		std::uint32_t const t0 = millis();
+		while (millis() - t0 < 200) {
+			if (mag_adc.data_ready()) ++lows;
+			++polls;
+		}
+		char m[96];
+		snprintf(m, sizeof(m), "DRDY low on %lu / %lu polls in 200ms (0 => no conversions = no ADC clock)\n", static_cast<unsigned long>(lows), static_cast<unsigned long>(polls));
+		Serial.print(m);
+
+		// Dump a few raw frames: status word 0xCx = real data; all 00 = DOUT idle.
+		for (int i = 0; i < 3; ++i) mag_adc.dump_frame();
+		mag_adc.stop();
+	}
+
+	mag_adc.self_test_adc();  // active ADC self-test via the internal test signal
+	mag_adc.start();          // START last: both chips begin sampling synchronously
 }
 
 void loop() {
 	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
 
+	return;
+
 	char line[320];
 	snprintf(line, sizeof(line),
 	    "t=%lu.%03lu T1=%.1f T2=%.1f T3=%.1f T4=%.1f T5=%.1f T6=%.1f T7=%.1f T8=%.1f "
 	    "T9=%.1f T10=%.1f T11=%.1f T12=%.1f T13=%.1f T14=%.1f T15=%.1f T16=%.1f\n",
-	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp1.get_measurement(), temp2.get_measurement(), temp3.get_measurement(), temp4.get_measurement(), temp5.get_measurement(), temp6.get_measurement(), temp7.get_measurement(), temp8.get_measurement(),
-	    temp9.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement());
+	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp1.get_measurement(), temp2.get_measurement(), temp3.get_measurement(), temp4.get_measurement(), temp5.get_measurement(), temp6.get_measurement(),
+	    temp7.get_measurement(), temp8.get_measurement(), temp9.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(),
+	    temp16.get_measurement());
 	Serial.print(line);
+
+	mag_read_frame();  // latch one synchronized frame from both ADS131E08
+
+	char mag_line[420];
+	snprintf(mag_line, sizeof(mag_line),
+	    "t=%lu.%03lu B1=%.3f B2=%.3f B3=%.3f B4=%.3f B5=%.3f B6=%.3f B7=%.3f B8=%.3f "
+	    "B9=%.3f B10=%.3f B11=%.3f B12=%.3f B13=%.3f B14=%.3f B15=%.3f B16=%.3f uT\n",
+	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), mag1.get_measurement(), mag2.get_measurement(), mag3.get_measurement(), mag4.get_measurement(), mag5.get_measurement(), mag6.get_measurement(),
+	    mag7.get_measurement(), mag8.get_measurement(), mag9.get_measurement(), mag10.get_measurement(), mag11.get_measurement(), mag12.get_measurement(), mag13.get_measurement(), mag14.get_measurement(), mag15.get_measurement(),
+	    mag16.get_measurement());
+	Serial.print(mag_line);
 
 	delay(1000);
 }
