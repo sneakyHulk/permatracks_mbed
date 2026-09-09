@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <MCP9700B.h>
 #include <SPI.h>
 
 #include <cstdint>
@@ -7,6 +8,25 @@ static bool led_state = LOW;
 
 // Device-register view of the OTG_FS core (frame number lives in DSTS).
 #define OTG_FS_DEV ((USB_OTG_DeviceTypeDef*)((uint32_t)USB_OTG_FS + USB_OTG_DEVICE_BASE))
+
+// One MCP9700B per temperature channel. VERIFY each pin against your nets;
+// PC2/PC3 are the _C direct pads, PB2 has no ADC (don't use it here).
+static MCP9700B temp1(PA_0);
+static MCP9700B temp2(PC_0);
+static MCP9700B temp3(PC_1);
+static MCP9700B temp4(PC_2_C);
+static MCP9700B temp5(PC_3_C);
+static MCP9700B temp6(PA_3);
+static MCP9700B temp7(PA_2);
+static MCP9700B temp8(PA_1);
+static MCP9700B temp9(PA_4);
+static MCP9700B temp10(PA_6);
+static MCP9700B temp11(PA_5);
+static MCP9700B temp12(PA_7);
+static MCP9700B temp13(PC_4);
+static MCP9700B temp14(PC_5);
+static MCP9700B temp15(PB_0);
+static MCP9700B temp16(PB_1);
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -147,15 +167,36 @@ void setup() {
 	// sof_interval_dump();  // DIAGNOSTIC (confirmed a steady doublet → PSC=1)
 	sof_timer_init();   // SOF fills TIM5 (÷2 for the doublet) → CNT = ms
 	sof_timer_check();  // verify CNT advances 1:1 with the DSTS frame
+
+	// configure all temperature ADC pins
+	temp1.begin();
+	temp2.begin();
+	temp3.begin();
+	temp4.begin();
+	temp5.begin();
+	temp6.begin();
+	temp7.begin();
+	temp8.begin();
+	temp9.begin();
+	temp10.begin();
+	temp11.begin();
+	temp12.begin();
+	temp13.begin();
+	temp14.begin();
+	temp15.begin();
+	temp16.begin();
 }
 
 void loop() {
-	std::uint32_t const ms = sof_ms();  // SOF-driven ms — read once/sec, but counts in HW
-	std::uint32_t const us = micros();  // MCU SysTick — CHECK ONLY, for comparison
+	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
 
-	char msg[96];
-	snprintf(msg, sizeof(msg), "sof = %lu.%03lu s   micros = %lu.%06lu s\n", static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), static_cast<unsigned long>(us / 1000000UL), static_cast<unsigned long>(us % 1000000UL));
-	Serial.print(msg);
+	char line[320];
+	snprintf(line, sizeof(line),
+	    "t=%lu.%03lu T1=%.1f T2=%.1f T3=%.1f T4=%.1f T5=%.1f T6=%.1f T7=%.1f T8=%.1f "
+	    "T9=%.1f T10=%.1f T11=%.1f T12=%.1f T13=%.1f T14=%.1f T15=%.1f T16=%.1f\n",
+	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp1.get_measurement(), temp2.get_measurement(), temp3.get_measurement(), temp4.get_measurement(), temp5.get_measurement(), temp6.get_measurement(), temp7.get_measurement(), temp8.get_measurement(),
+	    temp9.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement());
+	Serial.print(line);
 
 	delay(1000);
 }
