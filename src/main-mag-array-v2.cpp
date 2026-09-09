@@ -551,9 +551,9 @@ void loop() {
 	}
 
 	{  // poll AK09940A
-		if (auto t1 = micros(); t1 - t0 < 3500) {
-			delayMicroseconds(3500 - (t1 - t0));  // > 3.1ms
-		}
+		// if (auto t1 = micros(); t1 - t0 < 3100) {
+		// 	delayMicroseconds(3100 - (t1 - t0));  // > 3.1ms
+		// }
 
 		/*ak000.start_measurement();
 		ak001.start_measurement();

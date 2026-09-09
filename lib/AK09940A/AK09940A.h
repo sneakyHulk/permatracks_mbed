@@ -8,6 +8,7 @@
 
 class AK09940A final {
 	constexpr static auto retries = 5;
+	constexpr static std::uint32_t drdy_poll_count = 200;  // 200 * 20 us = 4000 us total
 	inline static std::uint8_t N = 0;
 
    public:
@@ -124,26 +125,25 @@ class AK09940A final {
 			return MagneticFluxDensityDataRawAK09940A{.bytes = {255, 255, 255, 255, 255, 255, 255}};
 		};
 
-		digitalWrite(cs_pin, LOW);
+		// External trigger measurement: the TRG pulse is issued in the main loop; here we wait
+		// for Data Ready by polling the DRDY bit in the ST register (0x0F, bit0). Reading ST does
+		// NOT clear DRDY, so it is safe to poll. Each poll must be its own CS-framed transaction
+		// (spiRead): re-sending the address inside a single CS-low burst does not re-read ST, which
+		// is why the earlier in-burst polling never worked. Bounded by a timeout so a dead/slow
+		// sensor can never hang the whole array.
 
-		// polling does not work! -> don't need for trg, because it is always one in the buffer after wait period!
-		// do {
-		//	spi->transfer(ST | 0x80);
-		//
-		//	if (std::uint8_t const status = spi->transfer(0x00); status & 0b0000'0001) break;
-		//} while (true);
-		for (auto i = 0; i < retries; ++i) {
-			// spi->transfer(0x00 | 0x80);
-			// std::uint8_t const wia1 = spi->transfer(0x00);
-			// std::uint8_t const wia2 = spi->transfer(0x00);
-			// std::uint8_t const rsv1 = spi->transfer(0x00);
-			// std::uint8_t const rsv2 = spi->transfer(0x00);
+		for (std::uint32_t i = 0; i < drdy_poll_count; ++i) {
+			if (spiRead(ST) & 0b0000'0001) {  // ST (0x0F): bit0 = DRDY
+				digitalWrite(cs_pin, LOW);
 
-			spi->transfer(ST1 | 0x80);
-			std::uint8_t const st1 = spi->transfer(0x00);
+				spi->transfer(ST1 | 0x80);
 
-			// if (wia1 == EXPECTED_WIA1 && wia2 == EXPECTED_WIA2 && st1 & 0b0000'0001) {
-			if (st1 & 0b0000'0001) {
+				// re-check DRDY at read time; error state if not ready
+				if (std::uint8_t const st1 = spi->transfer(0x00); !(st1 & 0b0000'0001)) {  // ST1 (0x10): bit0 = DRDY
+					digitalWrite(cs_pin, HIGH);
+					return MagneticFluxDensityDataRawAK09940A{.bytes = {255, 255, 255, 255, 255, 255, 255}};
+				}
+
 				std::uint8_t const hxl = spi->transfer(0x00);
 				std::uint8_t const hxm = spi->transfer(0x00);
 				std::uint8_t const hxh = spi->transfer(0x00);
@@ -154,22 +154,23 @@ class AK09940A final {
 				std::uint8_t const hzm = spi->transfer(0x00);
 				std::uint8_t const hzh = spi->transfer(0x00);
 				std::uint8_t const tmps = spi->transfer(0x00);
-				std::uint8_t const dor = spi->transfer(0x00);
+				std::uint8_t const st2 = spi->transfer(0x00);  // ST2 (0x1B): bit0 = DOR, bit1 = INV
 
 				digitalWrite(cs_pin, HIGH);
 
-				if (dor & 0b0000'0010) {
+				// error state on invalid or skipped data (no retry)
+				if (st2 & 0b0000'0010) {  // INV: data invalid
 					// common2::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data is invalid!");
-					continue;
+					return MagneticFluxDensityDataRawAK09940A{.bytes = {255, 255, 255, 255, 255, 255, 255}};
 				}
 
-				if ((dor & 0x01) == 1) {
+				if (st2 & 0b0000'0001) {  // DOR: data skipped / overrun
 					// common2::println_time_loc(millis(), '\'', "AK09940A ", n, '\'', " data has been skipped!");
-					continue;
+					return MagneticFluxDensityDataRawAK09940A{.bytes = {255, 255, 255, 255, 255, 255, 255}};
 				}
 
 				double const temp = 30.0 - static_cast<std::int8_t>(tmps) / 1.7;
-
+				static_cast<void>(temp);
 				// common2::println('\'', "AK09940A ", n, '\'', " ", temp, "°C");
 
 				std::uint32_t const x_raw = (static_cast<std::uint32_t>(hxh & 0x03) << 16) | (static_cast<std::uint32_t>(hxm) << 8) | static_cast<std::uint32_t>(hxl);
@@ -182,9 +183,8 @@ class AK09940A final {
 
 				return MagneticFluxDensityDataRawAK09940A{.x = -hx, .y = -hy, .z = hz};
 			}
+			delayMicroseconds(20);
 		}
-
-		digitalWrite(cs_pin, HIGH);
 
 		return MagneticFluxDensityDataRawAK09940A{.bytes = {255, 255, 255, 255, 255, 255, 255}};
 	}
