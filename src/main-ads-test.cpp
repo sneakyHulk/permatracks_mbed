@@ -3,11 +3,13 @@
 #include <cstdint>
 
 // =============================================================================
-// ADS131E08 — ONE SINGLE CAPTURE via RDATA. No reset, no register change.
+// ADS131E08 — CONTINUOUS READS via RDATA. No reset, no register change.
 //
-// Only two opcodes are sent: SDATAC (leave the power-up streaming mode, which
-// RDATA requires) and RDATA (fetch the latest frame on demand). Registers stay
-// at power-up defaults (CONFIG1 = 0x91: daisy-chain, 32 kSPS => 16-BIT samples).
+// Only two opcodes are ever sent: SDATAC once (leave the power-up streaming
+// mode, which RDATA requires), then RDATA on every read (fetch the latest frame
+// on demand). START stays high so the chip converts continuously; we sample it
+// at our own pace. Registers stay at power-up defaults (CONFIG1 = 0x91:
+// daisy-chain, 32 kSPS => 16-BIT samples).
 //
 // One frame at power-up defaults = 24 status bits + 8 x 16 data bits
 //                                = 152 bits = 19 bytes.
@@ -81,12 +83,22 @@ static void cmd(std::uint8_t const op) {
 
 static constexpr std::uint8_t SDATAC = 0x11;  // Stop Data Continuous: leave streaming so RDATA works
 static constexpr std::uint8_t RDATA = 0x12;   // Read Data: "load the output shift register with the latest data"
+static constexpr std::uint8_t WREG = 0x40;    // 010r rrrr: write register r
+
+// Write 1 register: [WREG|addr][count-1 = 0][value], one CS frame.
+static void wreg(std::uint8_t const addr, std::uint8_t const val) {
+	std::uint8_t const tx[3] = {static_cast<std::uint8_t>(WREG | addr), 0x00, val};
+	std::uint8_t rx[3];
+	digitalWrite(CS, LOW);
+	spi4_xfer(tx, rx, 3);
+	digitalWrite(CS, HIGH);
+}
 
 void setup() {
 	Serial.begin();
 	for (std::uint32_t t0 = millis(); !Serial && millis() - t0 < 3000;) {  // wait max 3 s for the host
 	}
-	Serial.println("=== ADS131E08 single capture (no reset, no config) ===");
+	Serial.println("=== ADS131E08 continuous RDATA reads (no reset, no config) ===");
 	Serial.println("=== BUILD " __DATE__ " " __TIME__ " ===");
 
 	// STEP 1 — pins. CS idle HIGH (deselected), START idle LOW (not converting).
@@ -104,42 +116,54 @@ void setup() {
 	// This is a command, not a register write: no configuration is changed.
 	cmd(SDATAC);
 
-	// STEP 4 — START high => the chip begins converting (needs its CLK to do so).
-	// At 32 kSPS default, first settled data after tSETTLE = 296 tCLK = 145 us.
-	digitalWrite(START, HIGH);
-	delay(2);
+	// STEP 3b — VREF CHECK using the chip's own internal supply monitor (MUX=011,
+	// datasheet §9.3.2.4). These are KNOWN voltages, independent of any sensor:
+	//   CH1 -> 0.5*(AVDD-AVSS) = 2.500 V   -> code = 2.5   / VREF * 32768  (20000 @ 4.096 V)
+	//   CH3 -> DVDD/4           = 0.825 V   -> code = 0.825 / VREF * 32768  ( 6600 @ 4.096 V)
+	// CH3 is the clean probe (small, won't saturate): VREF = 0.825 * 32768 / code.
+	// CHnSET bits 7..0: PD=0 | GAIN=001 (x1) | 0 | MUX=011
+	wreg(0x05, 0b0001'0011);  // CH1SET
+	wreg(0x07, 0b0001'0011);  // CH3SET
 
-	// STEP 5 — the capture with RDATA, in ONE CS frame (see the RDATA figure):
-	// send the RDATA opcode, then keep clocking — the chip answers immediately
-	// with "Status Register + N-Channel Data". §9.5.3.10: "no wait time needed
-	// for the subsequent data retrieval SCLKs", and the read "can overlap the
-	// next DRDY occurrence without data corruption" — so SCLK speed no longer
-	// matters here (unlike streaming). At the power-up default (CONFIG1=0x91,
-	// 32 kSPS) samples are 16-bit: 24 status + 8x16 = 152 bits = 19 bytes.
+	// STEP 4 — START high and LEAVE it high: the chip converts continuously in
+	// the background (a new frame every 31 us at the 32 kSPS default). We just
+	// fetch the latest one whenever we like with RDATA.
+	digitalWrite(START, HIGH);
+	delay(2);  // > tSETTLE (145 us at 32 kSPS) before the first fetch
+}
+
+// Fetch ONE fresh frame with RDATA and print it. RDATA latches a snapshot of
+// the latest conversion, so the read "can overlap the next DRDY occurrence
+// without data corruption" (§9.5.3.10) — no DRDY pin, no speed constraint.
+// Frame at power-up default (32 kSPS, 16-bit): 24 status + 8x16 = 19 bytes.
+static void read_and_print() {
 	std::uint8_t tx[20] = {RDATA};  // byte 0 = opcode, bytes 1..19 = don't care
 	std::uint8_t rx[20];
 	digitalWrite(CS, LOW);
-	spi4_xfer(tx, rx, 20);
+	spi4_xfer(tx, rx, 20);  // one CS frame: opcode + 19 data bytes
 	digitalWrite(CS, HIGH);
 	std::uint8_t const* const b = rx + 1;  // frame starts right after the opcode byte
 
-	digitalWrite(START, LOW);  // done converting
-
-	// STEP 5 — decode. Byte 0 must be 0xC? (status word always starts 1100).
-	// Then 8 channels x 2 bytes, MSB first, two's complement (16-bit).
-	char m[200];
-	int p = snprintf(m, sizeof(m), "raw:");
-	for (int i = 0; i < 19; ++i) p += snprintf(m + p, sizeof(m) - static_cast<size_t>(p), " %02X", b[i]);
-	Serial.println(m);
-
+	// Decode: byte 0 must be 0xC? (status word always starts 1100); then
+	// 8 channels x 2 bytes, MSB first, two's complement (16-bit).
 	std::uint32_t const status = (static_cast<std::uint32_t>(b[0]) << 16) | (static_cast<std::uint32_t>(b[1]) << 8) | b[2];
-	p = snprintf(m, sizeof(m), "status=%06lX -> %s  ch:", static_cast<unsigned long>(status), (b[0] & 0xF0) == 0xC0 ? "CONVERTING" : "NO-CONVERT");
+	char m[160];
+	int p = snprintf(m, sizeof(m), "%8lu ms  status=%06lX %s  ch:", static_cast<unsigned long>(millis()), static_cast<unsigned long>(status), (b[0] & 0xF0) == 0xC0 ? "OK " : "BAD");
+	std::int16_t v[8];
 	for (int ch = 0; ch < 8; ++ch) {
-		std::int16_t const v = static_cast<std::int16_t>((static_cast<std::uint16_t>(b[3 + ch * 2]) << 8) | b[4 + ch * 2]);
-		p += snprintf(m + p, sizeof(m) - static_cast<size_t>(p), " %d", v);
+		v[ch] = static_cast<std::int16_t>((static_cast<std::uint16_t>(b[3 + ch * 2]) << 8) | b[4 + ch * 2]);
+		p += snprintf(m + p, sizeof(m) - static_cast<size_t>(p), " %6d", v[ch]);
+	}
+	// VREF from the CH3 supply monitor (DVDD/4 = 0.825 V): VREF = 0.825 * 32768 / code.
+	// (CH1 monitors 2.5 V and should read code ~ 2.5/VREF*32768; it saturates if VREF < 2.5 V.)
+	if (v[2] > 0) {
+		double const vref = 0.825 * 32768.0 / v[2];
+		snprintf(m + p, sizeof(m) - static_cast<size_t>(p), "  | VREF~%.3f V (want 4.096)", vref);
 	}
 	Serial.println(m);
-	Serial.println("=== done ===");
 }
 
-void loop() {}
+void loop() {
+	read_and_print();
+	delay(100);  // 10 reads/s — change freely; the chip keeps converting regardless
+}
