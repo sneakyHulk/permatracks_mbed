@@ -57,17 +57,15 @@ static void spi4_begin() {
 static void spi4_xfer(std::uint8_t* const tx, std::uint8_t* const rx, std::uint16_t const n) { HAL_SPI_TransmitReceive(&hspi4, tx, rx, n, 100); }
 
 // ---- ADS131E08 protocol ----
-static constexpr std::uint8_t RDATAC = 0x10, SDATAC = 0x11, RDATA = 0x12, RREG = 0x20, WREG = 0x40;
+static constexpr std::uint8_t RDATAC = 0x10, SDATAC = 0x11, RREG = 0x20, WREG = 0x40;
 static constexpr std::uint8_t CONFIG1 = 0x01, CONFIG2 = 0x02, CH1SET = 0x05;
 // CONFIG1 bits 7..0: 1 | DAISY_IN=0 (chain) | CLK_EN=0 | 1 | 0 | DR=110 (1 kSPS, 24-bit)
 static constexpr std::uint8_t kConfig1_1kSPS = 0b1001'0110;
-// CONFIG2: 1 1 1 | INT_TEST | 0 | TEST_AMP=0 | TEST_FREQ=11 (DC)
-static constexpr std::uint8_t kConfig2_Normal = 0b1110'0000;  // internal test signal off
-static constexpr std::uint8_t kConfig2_Test = 0b1111'0011;    // internal test signal on, DC
-// CHnSET: PD=0 | GAIN=001 (x1) | 0 | MUX[2:0]
-static constexpr std::uint8_t kMuxNormal = 0b0001'0000;  // MUX=000 external pins
-static constexpr std::uint8_t kMuxShort = 0b0001'0001;   // MUX=001 inputs shorted to mid-supply -> expect ~0
-static constexpr std::uint8_t kMuxTest = 0b0001'0101;    // MUX=101 internal test signal -> expect ~-3495 (2^23/2400)
+// CONFIG2 bits 7..0: 1 1 1 | INT_TEST=1 (generate test signal on-chip) | 0 | TEST_AMP=0 (x1) | TEST_FREQ=11 (DC)
+static constexpr std::uint8_t kConfig2_Test = 0b1111'0011;
+// CHnSET bits 7..0: PD=0 | GAIN=001 (x1) | 0 | MUX=101 (internal test signal, pins disconnected)
+// Test level = -VREF/2400 -> code = -(2^23/2400) = -3495 at gain 1, independent of VREF.
+static constexpr std::uint8_t kMuxTest = 0b0001'0101;
 
 // Frame at 1 kSPS (24-bit): 24 status bits + 8 x 24 data bits = 216 bits = 27 bytes
 static constexpr int kFrameBytes = 27;
@@ -141,42 +139,14 @@ static void print_frame(std::uint8_t const* const b, char const* const tag) {
 	Serial.println(m);
 }
 
-// Single on-demand frame via RDATA (works in SDATAC mode, no DRDY needed).
-static void rdata_frame(std::uint8_t* const frame) {
-	std::uint8_t tx[1 + kFrameBytes] = {RDATA};
-	std::uint8_t rx[1 + kFrameBytes];
-	digitalWrite(CS, LOW);
-	spi4_xfer(tx, rx, 1 + kFrameBytes);
-	digitalWrite(CS, HIGH);
-	for (int i = 0; i < kFrameBytes; ++i) frame[i] = rx[1 + i];
-}
-
-// CHANNEL SELF-TEST: disconnect the pins via the input MUX and feed each
-// channel a KNOWN internal signal. Isolates "pin/board problem" from "channel
-// damaged". Requires SDATAC mode and START high.
-//   SHORT: MUX=001 inputs tied to mid-supply -> every channel ~0 (small offset)
-//   TEST : MUX=101 internal -VREF/2400   -> every channel ~ -3495 +/- 1100
-// A channel that still reads a rail here is internally damaged; one that reads
-// normally here but rails on MUX=000 has the problem at its pins.
-static void channel_selftest() {
-	std::uint8_t f[kFrameBytes];
-
-	for (std::uint8_t ch = 0; ch < 8; ++ch) wreg(CH1SET + ch, kMuxShort);
-	delay(10);  // tSETTLE 4.5 ms + 3 tDR (3 ms) after the mux step
-	rdata_frame(f);
-	print_frame(f, "SHORT");
-	Serial.println("          ^ want all ~0 (|x| < ~2000)");
-
-	wreg(CONFIG2, kConfig2_Test);
-	for (std::uint8_t ch = 0; ch < 8; ++ch) wreg(CH1SET + ch, kMuxTest);
-	delay(10);
-	rdata_frame(f);
-	print_frame(f, "TEST");
-	Serial.println("          ^ want all ~ -3495 (2^23/2400), tolerance +/-1100");
-
-	wreg(CONFIG2, kConfig2_Normal);  // restore: pins back on the inputs
-	for (std::uint8_t ch = 0; ch < 8; ++ch) wreg(CH1SET + ch, kMuxNormal);
-	delay(10);
+// Write one register and read it back; prints OK/FAIL.
+static bool wreg_verify(char const* const name, std::uint8_t const addr, std::uint8_t const val) {
+	wreg(addr, val);
+	std::uint8_t const rb = rreg(addr);
+	char m[80];
+	snprintf(m, sizeof(m), "%-8s = 0x%02X (want 0x%02X) -> %s\n", name, rb, val, rb == val ? "OK" : "FAIL");
+	Serial.print(m);
+	return rb == val;
 }
 
 void setup() {
@@ -202,10 +172,15 @@ void setup() {
 	snprintf(m, sizeof(m), "ID = 0x%02X (want 0xD2) -> %s\n", id, id == 0xD2 ? "OK" : "FAIL");
 	Serial.print(m);
 
-	wreg(CONFIG1, kConfig1_1kSPS);  // 1 kSPS, 24-bit
-	std::uint8_t const c1 = rreg(CONFIG1);
-	snprintf(m, sizeof(m), "CONFIG1 = 0x%02X (want 0x%02X) -> %s\n", c1, kConfig1_1kSPS, c1 == kConfig1_1kSPS ? "OK" : "FAIL");
-	Serial.print(m);
+	// ---- ALL register writes happen here, before RDATAC and before START ----
+	wreg_verify("CONFIG1", CONFIG1, kConfig1_1kSPS);  // 1 kSPS, 24-bit
+	wreg_verify("CONFIG2", CONFIG2, kConfig2_Test);   // internal test signal ON, DC
+	for (std::uint8_t ch = 0; ch < 8; ++ch) {         // every channel: MUX=101 = internal test signal
+		char name[8];
+		snprintf(name, sizeof(name), "CH%dSET", ch + 1);
+		wreg_verify(name, static_cast<std::uint8_t>(CH1SET + ch), kMuxTest);
+	}
+	Serial.println("expect every channel ~ -3495 (= -VREF/2400 -> 2^23/2400), tolerance +/-1100");
 
 	cmd(RDATAC);                // streaming mode: frames appear on DOUT at every DRDY
 	digitalWrite(START, HIGH);  // convert continuously from here on
@@ -216,6 +191,6 @@ void loop() {
 	std::uint8_t b[kFrameBytes];
 	bool const synced = wait_drdy_falling();  // align to a fresh frame (every 1 ms)
 	rdatac_read(b);
-	print_frame(b, synced);
+	print_frame(b, synced ? "DRDY" : "TIMEOUT");
 	delay(100);
 }
