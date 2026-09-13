@@ -37,8 +37,9 @@ static MCP9700B temp16(adc1, ADC_CHANNEL_5);   // PB1
 
 // --- Magnetometers: TWO daisy-chained ADS131E08 (16 channels) on SPI4 ---
 // SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
+// Arduino pin NUMBERS (PE4, not PE_4): the PinName values are off by 2 on this variant.
 static HalSpi4 spi4;  // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
-static ADS131E08 mag_adc(spi4, PE_4, PE_3, PE_14, PB_10, PB_11);  // (spi, CS, DRDY, START=PE14, nRESET0=PB10, nRESET1=PB11), VREF=4.096 V
+static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 1 kSPS, 24-bit, VREF=4.096 V
 
 // One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
 // ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
@@ -58,14 +59,6 @@ static FLC100 mag13(mag_adc, 12);
 static FLC100 mag14(mag_adc, 13);
 static FLC100 mag15(mag_adc, 14);
 static FLC100 mag16(mag_adc, 15);
-
-// Wait (briefly) for a fresh conversion, then latch one full frame.
-static void mag_read_frame() {
-	std::uint32_t const t0 = micros();
-	while (!mag_adc.data_ready() && micros() - t0 < 5000) {
-	}  // wait up to 5 ms for DRDY (1 kSPS → new frame every ~1 ms)
-	mag_adc.read();
-}
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -193,8 +186,8 @@ static void sof_timer_check() {
 
 void setup() {
 	{  // turn led on (wiring: 3V3 → resistor → LED → pin, i.e. active-low → LOW = on)
-		pinMode(PC_11, OUTPUT);
-		digitalWrite(PC_11, !led_state);  // led_state == LOW → LED on
+		pinMode(PC11, OUTPUT);
+		digitalWrite(PC11, !led_state);  // led_state == LOW → LED on
 	}
 
 	{  // config Serial over USB
@@ -212,51 +205,14 @@ void setup() {
 	adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
 	adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
 
-	spi4.begin();  // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
-
-	{  // TEMP DIAGNOSTIC: confirm SPI4 is now configured (CFG2 MASTER set) and a byte clocks.
-		char d[160];
-		snprintf(d, sizeof(d), "SPI4 CR1=%08lX CFG1=%08lX CFG2=%08lX CR2=%08lX SR=%08lX\n",
-		    static_cast<unsigned long>(SPI4->CR1), static_cast<unsigned long>(SPI4->CFG1),
-		    static_cast<unsigned long>(SPI4->CFG2), static_cast<unsigned long>(SPI4->CR2),
-		    static_cast<unsigned long>(SPI4->SR));
-		Serial.print(d);
-		std::uint8_t const r = spi4.transfer(0x00);
-		snprintf(d, sizeof(d), "probe: transfer returned 0x%02X\n", r);
-		Serial.print(d);
-		Serial.flush();
-	}
-
-	mag_adc.begin();          // configure + ID/register self-test (logs each step)
-
-	{  // DRDY diagnostic: is the ADC actually converting? DRDY should pulse low at
-		// the data rate. If it NEVER goes low, there are no conversions → the ADS
-		// has no conversion clock (external CLK pin / CLKSEL), which also explains
-		// all-zero codes even though SPI register I/O works.
-		mag_adc.start();
-		std::uint32_t lows = 0, polls = 0;
-		std::uint32_t const t0 = millis();
-		while (millis() - t0 < 200) {
-			if (mag_adc.data_ready()) ++lows;
-			++polls;
-		}
-		char m[96];
-		snprintf(m, sizeof(m), "DRDY low on %lu / %lu polls in 200ms (0 => no conversions = no ADC clock)\n", static_cast<unsigned long>(lows), static_cast<unsigned long>(polls));
-		Serial.print(m);
-
-		// Dump a few raw frames: status word 0xCx = real data; all 00 = DOUT idle.
-		for (int i = 0; i < 3; ++i) mag_adc.dump_frame();
-		mag_adc.stop();
-	}
-
-	mag_adc.self_test_adc();  // active ADC self-test via the internal test signal
-	mag_adc.start();          // START last: both chips begin sampling synchronously
+	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
+	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
+	mag_adc.self_test();  // both chips on the internal test signal: all 16 channels ~ -3495 + offset, status words 0xC...
+	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
 }
 
 void loop() {
 	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
-
-	return;
 
 	char line[320];
 	snprintf(line, sizeof(line),
@@ -267,7 +223,7 @@ void loop() {
 	    temp16.get_measurement());
 	Serial.print(line);
 
-	mag_read_frame();  // latch one synchronized frame from both ADS131E08
+	mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
 
 	char mag_line[420];
 	snprintf(mag_line, sizeof(mag_line),

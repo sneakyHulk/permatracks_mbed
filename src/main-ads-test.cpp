@@ -12,9 +12,12 @@
 // numbers because PC2/PC3 are moved to the end of the pin table — PE_14 would
 // drive PH0, PE_3 would read MISO. (variant_generic.h: PE3=65 PE4=66 PE14=76)
 //
-// CONFIG1 set to 1 kSPS (=> 24-bit samples, 27-byte frame), everything else at
-// power-up defaults. No reset. RDATAC streaming: START pin high, then on each
-// DRDY falling edge clock the frame straight out of DOUT (no opcode) — Fig. 40.
+// TWO chips in a DAISY CHAIN: shared CS/SCLK/DIN/START/DRDY; chip B's DOUT feeds
+// chip A's DAISY_IN; chip A's DOUT is our MISO. Every register write reaches
+// both chips; register reads return chip A only (datasheet §10.1.3.3).
+// CONFIG1 = 1 kSPS (=> 24-bit), DAISY_IN=0 (chain mode). No reset. RDATAC
+// streaming: START high, then on each DRDY falling edge clock the 55-byte
+// chained frame straight out of DOUT (no opcode) — Fig. 40 / Fig. 56.
 // =============================================================================
 static constexpr std::uint32_t CS = PE4;      // chip select, active low
 static constexpr std::uint32_t START = PE14;  // high = convert
@@ -70,8 +73,14 @@ static constexpr std::uint8_t kConfig2_Test = 0b1111'0111;
 // Test level x2 = -2*VREF/2400 -> code = -2*(2^23/2400) = -6990 at gain 1, independent of VREF.
 static constexpr std::uint8_t kMuxTest = 0b0001'0101;
 
-// Frame at 1 kSPS (24-bit): 24 status bits + 8 x 24 data bits = 216 bits = 27 bytes
-static constexpr int kFrameBytes = 27;
+// DAISY CHAIN (datasheet §10.1.3.3, Fig. 56): device A's data set appears first,
+// then ONE don't-care bit, then device B's. Per device at 24-bit: 24 status bits
+// + 8 x 24 data bits = 216 bits. Total 216 + 1 + 216 = 433 bits -> 55 bytes.
+// The 1-bit gap misaligns device B from byte boundaries, so samples are pulled
+// out at the bit level (bits24 below).
+static constexpr std::uint32_t kBitsPerDevice = 24 + 8 * 24;  // 216
+static constexpr std::uint32_t kGapBits = 1;
+static constexpr int kFrameBytes = (2 * kBitsPerDevice + kGapBits + 7) / 8;  // 55
 
 // One byte, then wait tSDECODE (4 tCLK = 1.96 us): multi-byte commands like
 // RREG/WREG need this gap between bytes or the chip does not decode them.
@@ -118,9 +127,9 @@ static bool wait_drdy_falling(std::uint32_t const timeout_us = 5000) {
 	return true;
 }
 
-// RDATAC read: NO opcode — the frame is already streaming on DOUT; just clock
-// it out. Must finish inside one frame period (Eq. 9): 216 bits @ 7.5 MHz =
-// 29 us, far below the 1 ms period at 1 kSPS.
+// RDATAC read: NO opcode — the chained frame is already streaming on DOUT; just
+// clock it out. Must finish inside one frame period (Eq. 9): 440 bits @ 7.5 MHz
+// = 59 us, far below the 1 ms period at 1 kSPS.
 static void rdatac_read(std::uint8_t* const frame) {
 	std::uint8_t tx[kFrameBytes] = {};
 	digitalWrite(CS, LOW);
@@ -128,20 +137,37 @@ static void rdatac_read(std::uint8_t* const frame) {
 	digitalWrite(CS, HIGH);
 }
 
-// Decode + print one frame: status word (must start 0xC) and 8 x 24-bit
-// two's-complement channels (MSB first). `tag` labels the line.
-// 24-bit two's-complement sample of channel n (1..8) from a frame: 3 status
-// bytes, then 3 bytes per channel, MSB first.
-static std::int32_t sample(std::uint8_t const* const b, int const n) {
-	std::uint8_t const* const p = b + 3 * n;  // n=1 -> bytes 3..5
-	std::int32_t v = (static_cast<std::int32_t>(p[0]) << 16) | (static_cast<std::int32_t>(p[1]) << 8) | p[2];
+// 24 bits, MSB first, starting at an arbitrary BIT offset in the frame.
+static std::uint32_t bits24(std::uint8_t const* const b, std::uint32_t const bitpos) {
+	std::uint32_t v = 0;
+	for (std::uint32_t i = 0; i < 24; ++i) {
+		std::uint32_t const k = bitpos + i;
+		v = (v << 1) | ((b[k >> 3] >> (7 - (k & 7))) & 1u);
+	}
+	return v;
+}
+
+// Device dev (0 = A, first in the frame; 1 = B, after the gap bit).
+static std::uint32_t bit_base(int const dev) { return static_cast<std::uint32_t>(dev) * (kBitsPerDevice + kGapBits); }
+
+// Status word of a device (always starts with 1100 = 0xC.....).
+static std::uint32_t status(std::uint8_t const* const b, int const dev) { return bits24(b, bit_base(dev)); }
+
+// 24-bit two's-complement sample of channel n (1..8) of device dev.
+static std::int32_t sample(std::uint8_t const* const b, int const dev, int const n) {
+	std::int32_t v = static_cast<std::int32_t>(bits24(b, bit_base(dev) + 24 + static_cast<std::uint32_t>(n - 1) * 24));
 	if (v & 0x800000) v -= 0x1000000;  // sign-extend 24 -> 32 bit
 	return v;
 }
 
+static bool status_ok(std::uint32_t const s) { return (s >> 20) == 0xC; }
+
 static void print_frame(std::uint8_t const* const b, char const* const tag) {
-	std::uint32_t const status = (static_cast<std::uint32_t>(b[0]) << 16) | (static_cast<std::uint32_t>(b[1]) << 8) | b[2];
-	common2::println_time(millis(), tag, "status", status, (b[0] & 0xF0) == 0xC0 ? "OK" : "BAD", "ch:", sample(b, 1), sample(b, 2), sample(b, 3), sample(b, 4), sample(b, 5), sample(b, 6), sample(b, 7), sample(b, 8));
+	std::uint32_t const sA = status(b, 0);
+	std::uint32_t const sB = status(b, 1);
+	common2::println_time(millis(), tag, "A", sA, status_ok(sA) ? "OK" : "BAD", "B", sB, status_ok(sB) ? "OK" : "BAD");
+	common2::println("   A:", sample(b, 0, 1), sample(b, 0, 2), sample(b, 0, 3), sample(b, 0, 4), sample(b, 0, 5), sample(b, 0, 6), sample(b, 0, 7), sample(b, 0, 8));
+	common2::println("   B:", sample(b, 1, 1), sample(b, 1, 2), sample(b, 1, 3), sample(b, 1, 4), sample(b, 1, 5), sample(b, 1, 6), sample(b, 1, 7), sample(b, 1, 8));
 }
 
 // Read one register and compare against the expected value. Read-only.
