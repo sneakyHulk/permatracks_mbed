@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <common2_output.h>
 
 #include <cstdint>
 
@@ -58,7 +59,9 @@ static void spi4_xfer(std::uint8_t* const tx, std::uint8_t* const rx, std::uint1
 
 // ---- ADS131E08 protocol ----
 static constexpr std::uint8_t RDATAC = 0x10, SDATAC = 0x11, RREG = 0x20, WREG = 0x40;
-static constexpr std::uint8_t CONFIG1 = 0x01, CONFIG2 = 0x02, CH1SET = 0x05;
+static constexpr std::uint8_t CONFIG1 = 0x01, CONFIG2 = 0x02;
+static constexpr std::uint8_t CH1SET = 0x05, CH2SET = 0x06, CH3SET = 0x07, CH4SET = 0x08;
+static constexpr std::uint8_t CH5SET = 0x09, CH6SET = 0x0A, CH7SET = 0x0B, CH8SET = 0x0C;
 // CONFIG1 bits 7..0: 1 | DAISY_IN=0 (chain) | CLK_EN=0 | 1 | 0 | DR=110 (1 kSPS, 24-bit)
 static constexpr std::uint8_t kConfig1_1kSPS = 0b1001'0110;
 // CONFIG2 bits 7..0: 1 1 1 | INT_TEST=1 (generate test signal on-chip) | 0 | TEST_AMP=0 (x1) | TEST_FREQ=11 (DC)
@@ -127,34 +130,33 @@ static void rdatac_read(std::uint8_t* const frame) {
 
 // Decode + print one frame: status word (must start 0xC) and 8 x 24-bit
 // two's-complement channels (MSB first). `tag` labels the line.
-static void print_frame(std::uint8_t const* const b, char const* const tag) {
-	std::uint32_t const status = (static_cast<std::uint32_t>(b[0]) << 16) | (static_cast<std::uint32_t>(b[1]) << 8) | b[2];
-	char m[220];
-	int p = snprintf(m, sizeof(m), "%8lu ms  %-8s status=%06lX %s  ch:", static_cast<unsigned long>(millis()), tag, static_cast<unsigned long>(status), (b[0] & 0xF0) == 0xC0 ? "OK " : "BAD");
-	for (int ch = 0; ch < 8; ++ch) {
-		std::int32_t v = (static_cast<std::int32_t>(b[3 + ch * 3]) << 16) | (static_cast<std::int32_t>(b[4 + ch * 3]) << 8) | b[5 + ch * 3];
-		if (v & 0x800000) v -= 0x1000000;  // sign-extend 24 -> 32 bit
-		p += snprintf(m + p, sizeof(m) - static_cast<size_t>(p), " %9ld", static_cast<long>(v));
-	}
-	Serial.println(m);
+// 24-bit two's-complement sample of channel n (1..8) from a frame: 3 status
+// bytes, then 3 bytes per channel, MSB first.
+static std::int32_t sample(std::uint8_t const* const b, int const n) {
+	std::uint8_t const* const p = b + 3 * n;  // n=1 -> bytes 3..5
+	std::int32_t v = (static_cast<std::int32_t>(p[0]) << 16) | (static_cast<std::int32_t>(p[1]) << 8) | p[2];
+	if (v & 0x800000) v -= 0x1000000;  // sign-extend 24 -> 32 bit
+	return v;
 }
 
-// Write one register and read it back; prints OK/FAIL.
-static bool wreg_verify(char const* const name, std::uint8_t const addr, std::uint8_t const val) {
-	wreg(addr, val);
-	std::uint8_t const rb = rreg(addr);
-	char m[80];
-	snprintf(m, sizeof(m), "%-8s = 0x%02X (want 0x%02X) -> %s\n", name, rb, val, rb == val ? "OK" : "FAIL");
-	Serial.print(m);
-	return rb == val;
+static void print_frame(std::uint8_t const* const b, char const* const tag) {
+	std::uint32_t const status = (static_cast<std::uint32_t>(b[0]) << 16) | (static_cast<std::uint32_t>(b[1]) << 8) | b[2];
+	common2::println_time(millis(), tag, "status", status, (b[0] & 0xF0) == 0xC0 ? "OK" : "BAD", "ch:", sample(b, 1), sample(b, 2), sample(b, 3), sample(b, 4), sample(b, 5), sample(b, 6), sample(b, 7), sample(b, 8));
+}
+
+// Read one register and compare against the expected value. Read-only.
+static bool verify(char const* const name, std::uint8_t const addr, std::uint8_t const expected) {
+	std::uint8_t const got = rreg(addr);
+	common2::println(name, "=", got, "want", expected, "->", got == expected ? "OK" : "FAIL");
+	return got == expected;
 }
 
 void setup() {
 	Serial.begin();
 	for (std::uint32_t t0 = millis(); !Serial && millis() - t0 < 3000;) {
 	}
-	Serial.println("=== ADS131E08 minimal (Arduino pins PE4/PE3/PE14) ===");
-	Serial.println("=== BUILD " __DATE__ " " __TIME__ " ===");
+	common2::println("=== ADS131E08 minimal (Arduino pins PE4/PE3/PE14) ===");
+	common2::println("=== BUILD " __DATE__ " " __TIME__ " ===");
 
 	pinMode(CS, OUTPUT);
 	digitalWrite(CS, HIGH);  // deselected
@@ -165,22 +167,34 @@ void setup() {
 	spi4_begin();
 	delay(50);
 
-	char m[96];
 	cmd(SDATAC);  // SDATAC: Stop Read Data Continuous Mode (The SDATAC command cancels the Read Data Continuous mode. There are no SCLK rate restrictions for this command, but the next command must wait for 4 tCLK cycles before
 	              // completion.)
-	std::uint8_t const id = rreg(0x00);  // 0xD2 = ADS131E08
-	snprintf(m, sizeof(m), "ID = 0x%02X (want 0xD2) -> %s\n", id, id == 0xD2 ? "OK" : "FAIL");
-	Serial.print(m);
 
-	// ---- ALL register writes happen here, before RDATAC and before START ----
-	wreg_verify("CONFIG1", CONFIG1, kConfig1_1kSPS);  // 1 kSPS, 24-bit
-	wreg_verify("CONFIG2", CONFIG2, kConfig2_Test);   // internal test signal ON, DC
-	for (std::uint8_t ch = 0; ch < 8; ++ch) {         // every channel: MUX=101 = internal test signal
-		char name[8];
-		snprintf(name, sizeof(name), "CH%dSET", ch + 1);
-		wreg_verify(name, static_cast<std::uint8_t>(CH1SET + ch), kMuxTest);
-	}
-	Serial.println("expect every channel ~ -3495 (= -VREF/2400 -> 2^23/2400), tolerance +/-1100");
+	// ---- WRITE: all register writes happen here, before RDATAC and before START ----
+	wreg(CONFIG1, kConfig1_1kSPS);  // 1 kSPS, 24-bit
+	wreg(CONFIG2, kConfig2_Test);   // internal test signal ON, DC
+	wreg(CH1SET, kMuxTest);         // each channel: MUX=101 = internal test signal
+	wreg(CH2SET, kMuxTest);
+	wreg(CH3SET, kMuxTest);
+	wreg(CH4SET, kMuxTest);
+	wreg(CH5SET, kMuxTest);
+	wreg(CH6SET, kMuxTest);
+	wreg(CH7SET, kMuxTest);
+	wreg(CH8SET, kMuxTest);
+
+	// ---- VERIFY: read everything back ----
+	verify("ID", 0x00, 0xD2);  // fixed device ID of an ADS131E08
+	verify("CONFIG1", CONFIG1, kConfig1_1kSPS);
+	verify("CONFIG2", CONFIG2, kConfig2_Test);
+	verify("CH1SET", CH1SET, kMuxTest);
+	verify("CH2SET", CH2SET, kMuxTest);
+	verify("CH3SET", CH3SET, kMuxTest);
+	verify("CH4SET", CH4SET, kMuxTest);
+	verify("CH5SET", CH5SET, kMuxTest);
+	verify("CH6SET", CH6SET, kMuxTest);
+	verify("CH7SET", CH7SET, kMuxTest);
+	verify("CH8SET", CH8SET, kMuxTest);
+	common2::println("expect every channel ~ -3495 (= -VREF/2400 -> 2^23/2400) plus channel offset");
 
 	cmd(RDATAC);                // streaming mode: frames appear on DOUT at every DRDY
 	digitalWrite(START, HIGH);  // convert continuously from here on

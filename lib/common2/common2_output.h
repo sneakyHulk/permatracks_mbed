@@ -20,10 +20,15 @@ namespace common2 {
 		return out;
 	}
 
-	[[maybe_unused]] void print(printable auto&&... args) { (print_low_level(args), ...); }
+	// Python-style: print(a, b, c) -> "a b c"  (one space BETWEEN arguments,
+	// none before the first); println additionally ends the line, and
+	// println() alone prints just a newline — exactly like Python's print().
+	[[maybe_unused]] void print(printable auto&&... args) {
+		[[maybe_unused]] char const* sep = "";
+		((print_low_level(sep), print_low_level(args), sep = " "), ...);
+	}
 	[[maybe_unused]] void println(printable auto&&... args) {
-		(print_low_level(args), ...);
-
+		print(args...);
 		println_low_level();
 	}
 
