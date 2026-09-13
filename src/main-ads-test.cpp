@@ -64,10 +64,10 @@ static constexpr std::uint8_t CH1SET = 0x05, CH2SET = 0x06, CH3SET = 0x07, CH4SE
 static constexpr std::uint8_t CH5SET = 0x09, CH6SET = 0x0A, CH7SET = 0x0B, CH8SET = 0x0C;
 // CONFIG1 bits 7..0: 1 | DAISY_IN=0 (chain) | CLK_EN=0 | 1 | 0 | DR=110 (1 kSPS, 24-bit)
 static constexpr std::uint8_t kConfig1_1kSPS = 0b1001'0110;
-// CONFIG2 bits 7..0: 1 1 1 | INT_TEST=1 (generate test signal on-chip) | 0 | TEST_AMP=0 (x1) | TEST_FREQ=11 (DC)
-static constexpr std::uint8_t kConfig2_Test = 0b1111'0011;
+// CONFIG2 bits 7..0: 1 1 1 | INT_TEST=1 (generate test signal on-chip) | 0 | TEST_AMP=1 (x2) | TEST_FREQ=11 (DC)
+static constexpr std::uint8_t kConfig2_Test = 0b1111'0111;
 // CHnSET bits 7..0: PD=0 | GAIN=001 (x1) | 0 | MUX=101 (internal test signal, pins disconnected)
-// Test level = -VREF/2400 -> code = -(2^23/2400) = -3495 at gain 1, independent of VREF.
+// Test level x2 = -2*VREF/2400 -> code = -2*(2^23/2400) = -6990 at gain 1, independent of VREF.
 static constexpr std::uint8_t kMuxTest = 0b0001'0101;
 
 // Frame at 1 kSPS (24-bit): 24 status bits + 8 x 24 data bits = 216 bits = 27 bytes
@@ -194,7 +194,7 @@ void setup() {
 	verify("CH6SET", CH6SET, kMuxTest);
 	verify("CH7SET", CH7SET, kMuxTest);
 	verify("CH8SET", CH8SET, kMuxTest);
-	common2::println("expect every channel ~ -3495 (= -VREF/2400 -> 2^23/2400) plus channel offset");
+	common2::println("expect every channel ~ -6990 (= -2*VREF/2400 -> 2*2^23/2400) plus channel offset");
 
 	cmd(RDATAC);                // streaming mode: frames appear on DOUT at every DRDY
 	digitalWrite(START, HIGH);  // convert continuously from here on
