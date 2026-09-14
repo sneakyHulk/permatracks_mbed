@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include <H7Adc.h>
 
 #include <cstdint>
@@ -9,30 +8,28 @@
 // MCP9700B — Microchip analog temperature sensor, read through an H7Adc.
 //
 // Transfer function: Vout = V0 + Tc * T, with V0 = 500 mV and Tc = 10 mV/°C.
-//   => T[°C] = (Vout_mV - 500) / 10
+//   => T[°C] = (Vout - 0.5 V) / 0.01 V/°C
 //
-// The sensor output is wired directly to an ADC pin. Construct with a reference
-// to the H7Adc for that ADC plus the pin's channel (see the H7 pin map), then
-// get_measurement(). That H7Adc must be begin()'d once beforehand.
+// One instance per sensor: the H7Adc for that pin's ADC plus the pin's channel
+// (ADC_CHANNEL_x, see the H7 pin map). The constructor enables the channel on
+// the ADC; the ADC must be begin()'d and read() once before get_measurement()
+// (it returns the last converted value).
+//   MCP9700B temp1(tmp_adc1, ADC_CHANNEL_16);   // PA0
 // -----------------------------------------------------------------------------
-class MCP9700B {
+class MCP9700B final {
    public:
-	// adc     : the H7Adc for this sensor's ADC (adc1 or adc3)
-	// channel : ADC_CHANNEL_x for the pin (e.g. PA0 = ADC_CHANNEL_16)
-	MCP9700B(H7Adc& adc, std::uint32_t const channel) : adc_(adc), channel_(channel) {}
+	MCP9700B(H7Adc& adc, std::uint32_t const channel) : adc_(adc), channel_(channel) { adc_.enable(channel_); }
 
-	// Temperature in degrees Celsius (single ADC read).
-	float get_measurement() const {
-		float const v_mv = static_cast<float>(adc_.read(channel_)) * kVrefmV / kAdcMax;
-		return (v_mv - kV0mV) / kTcmVperC;
-	}
+	// Temperature in degrees Celsius from the last adc.read().
+	[[nodiscard]] double get_measurement() const { return (adc_.volts(channel_) - v0) / tc; }
+
+	// Raw 12-bit ADC code.
+	[[nodiscard]] std::uint16_t raw() const { return adc_.raw(channel_); }
 
    private:
-	static constexpr float kAdcMax = 4095.0f;   // 12-bit
-	static constexpr float kVrefmV = 3300.0f;   // ADC reference = VREF+ (≈ VDDA 3.3 V), NOT the 5 V sensor supply
-	static constexpr float kV0mV = 500.0f;      // MCP9700B output at 0 °C
-	static constexpr float kTcmVperC = 10.0f;   // MCP9700B slope (10 mV/°C)
+	static constexpr double v0 = 0.5;   // MCP9700B output at 0 °C [V]
+	static constexpr double tc = 0.01;  // MCP9700B slope [V/°C]
 
 	H7Adc& adc_;
-	std::uint32_t channel_;
+	std::uint32_t const channel_;
 };

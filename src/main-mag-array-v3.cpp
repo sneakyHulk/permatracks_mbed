@@ -13,27 +13,27 @@ static bool led_state = LOW;
 // Device-register view of the OTG_FS core (frame number lives in DSTS).
 #define OTG_FS_DEV ((USB_OTG_DeviceTypeDef*)((uint32_t)USB_OTG_FS + USB_OTG_DEVICE_BASE))
 
-// One ADC driver each. adc1: PA/PC/PB channels. adc3: the PC2_C/PC3_C pads.
-static H7Adc adc1(ADC1);
-static H7Adc adc3(ADC3);
+// One ADC driver each. tmp_adc1: PA/PC/PB channels. tmp_adc3: the PC2_C/PC3_C pads.
+static H7Adc tmp_adc1(ADC1);
+static H7Adc tmp_adc3(ADC3);
 
 // One MCP9700B per temperature channel: (its H7Adc, channel). Comments show the pin.
-static MCP9700B temp1(adc1, ADC_CHANNEL_16);   // PA0
-static MCP9700B temp2(adc1, ADC_CHANNEL_10);   // PC0
-static MCP9700B temp3(adc1, ADC_CHANNEL_11);   // PC1
-static MCP9700B temp4(adc3, ADC_CHANNEL_0);    // PC2_C
-static MCP9700B temp5(adc3, ADC_CHANNEL_1);    // PC3_C
-static MCP9700B temp6(adc1, ADC_CHANNEL_15);   // PA3
-static MCP9700B temp7(adc1, ADC_CHANNEL_14);   // PA2
-static MCP9700B temp8(adc1, ADC_CHANNEL_17);   // PA1
-static MCP9700B temp9(adc1, ADC_CHANNEL_18);   // PA4
-static MCP9700B temp10(adc1, ADC_CHANNEL_3);   // PA6
-static MCP9700B temp11(adc1, ADC_CHANNEL_19);  // PA5
-static MCP9700B temp12(adc1, ADC_CHANNEL_7);   // PA7
-static MCP9700B temp13(adc1, ADC_CHANNEL_4);   // PC4
-static MCP9700B temp14(adc1, ADC_CHANNEL_8);   // PC5
-static MCP9700B temp15(adc1, ADC_CHANNEL_9);   // PB0
-static MCP9700B temp16(adc1, ADC_CHANNEL_5);   // PB1
+static MCP9700B temp1(tmp_adc1, ADC_CHANNEL_16);   // PA0
+static MCP9700B temp2(tmp_adc1, ADC_CHANNEL_10);   // PC0
+static MCP9700B temp3(tmp_adc1, ADC_CHANNEL_11);   // PC1
+static MCP9700B temp4(tmp_adc3, ADC_CHANNEL_0);    // PC2_C
+static MCP9700B temp5(tmp_adc3, ADC_CHANNEL_1);    // PC3_C
+static MCP9700B temp6(tmp_adc1, ADC_CHANNEL_15);   // PA3
+static MCP9700B temp7(tmp_adc1, ADC_CHANNEL_14);   // PA2
+static MCP9700B temp8(tmp_adc1, ADC_CHANNEL_17);   // PA1
+static MCP9700B temp9(tmp_adc1, ADC_CHANNEL_18);   // PA4
+static MCP9700B temp10(tmp_adc1, ADC_CHANNEL_3);   // PA6
+static MCP9700B temp11(tmp_adc1, ADC_CHANNEL_19);  // PA5
+static MCP9700B temp12(tmp_adc1, ADC_CHANNEL_7);   // PA7
+static MCP9700B temp13(tmp_adc1, ADC_CHANNEL_4);   // PC4
+static MCP9700B temp14(tmp_adc1, ADC_CHANNEL_8);   // PC5
+static MCP9700B temp15(tmp_adc1, ADC_CHANNEL_9);   // PB0
+static MCP9700B temp16(tmp_adc1, ADC_CHANNEL_5);   // PB1
 
 // --- Magnetometers: TWO daisy-chained ADS131E08 (16 channels) on SPI4 ---
 // SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
@@ -202,8 +202,8 @@ void setup() {
 	sof_timer_init();   // SOF fills TIM5 (÷2 for the doublet) → CNT = ms
 	sof_timer_check();  // verify CNT advances 1:1 with the DSTS frame
 
-	adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
-	adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
+	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
+	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
 
 	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
 	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
@@ -213,6 +213,9 @@ void setup() {
 
 void loop() {
 	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
+
+	tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
+	tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
 
 	char line[320];
 	snprintf(line, sizeof(line),
