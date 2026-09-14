@@ -5,16 +5,6 @@
 
 #include <cstdint>
 
-// -----------------------------------------------------------------------------
-// H7Adc — minimal direct driver for ONE STM32H7 ADC.
-//
-// The Arduino generic-H750 variant only exposes a subset of ADC pins to
-// analogRead() (PA pins work, most PC/PB pins return 0). This drives the ADC
-// peripheral directly by channel, so every channel reads.
-//
-// One instance per ADC:  H7Adc adc1(ADC1);  H7Adc adc3(ADC3);
-// Call begin() once, then read(channel) for a single polled 12-bit sample.
-// -----------------------------------------------------------------------------
 class H7Adc {
    public:
 	explicit H7Adc(ADC_TypeDef* const inst) : inst_(inst) {}

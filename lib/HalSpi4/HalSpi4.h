@@ -48,13 +48,6 @@ class HalSpi4 {
 	// Full-duplex exchange of n bytes in one transaction. 100 ms cap: never hangs.
 	void xfer(std::uint8_t* const tx, std::uint8_t* const rx, std::uint16_t const n) { HAL_SPI_TransmitReceive(&h_, tx, rx, n, 100); }
 
-	// Single byte exchange.
-	std::uint8_t transfer(std::uint8_t tx) {
-		std::uint8_t rx = 0;
-		xfer(&tx, &rx, 1);
-		return rx;
-	}
-
    private:
 	SPI_HandleTypeDef h_{};
 };
