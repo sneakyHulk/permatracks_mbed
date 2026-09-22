@@ -39,7 +39,8 @@ class ADS131E08 final {
    public:
 	static constexpr std::uint8_t n_chips = daisy_chain ? 2 : 1;
 	static constexpr std::uint8_t n_channels = 8 * n_chips;
-	static constexpr double vref = 4.096;  // external REF5040 on VREFP (PDB_REFBUF = 0)
+	static constexpr double vref = 4.096;                 // external REF5040 on VREFP (PDB_REFBUF = 0)
+	static constexpr std::int32_t full_scale = 1 << 23;  // 2^23 codes = +VREF at gain 1 (signed 24-bit output)
 
 	// Pins are Arduino pin numbers. One chip: one nRESET. Daisy chain: nRESET of chip A and of chip B.
 	ADS131E08(HalSpi4& spi, std::uint32_t const cs, std::uint32_t const drdy, std::uint32_t const start, std::uint32_t const nreset)
@@ -178,7 +179,7 @@ class ADS131E08 final {
 
 	// Last frame. ch = 0..n_channels-1 (0..7 chip A, 8..15 chip B); chip = 0 (A) / 1 (B).
 	[[nodiscard]] std::int32_t raw(std::uint8_t const ch) const { return raw_[ch]; }
-	[[nodiscard]] double volts(std::uint8_t const ch) const { return raw_[ch] * vref / 8388608.0; }  // gain 1: LSB = VREF / 2^23
+	[[nodiscard]] double volts(std::uint8_t const ch) const { return raw_[ch] * vref / full_scale; }  // gain 1: LSB = VREF / 2^23 = 488 nV
 	[[nodiscard]] std::uint32_t status(std::uint8_t const chip) const { return status_[chip]; }
 	[[nodiscard]] bool status_ok(std::uint8_t const chip) const { return (status_[chip] >> 20) == 0xC; }  // status word = 1100 | FAULT_STATP | FAULT_STATN | GPIO
 	[[nodiscard]] bool data_ready() const { return digitalRead(drdy_) == LOW; }
@@ -231,7 +232,7 @@ class ADS131E08 final {
 	static constexpr std::uint8_t chset_test = 0b0001'0101;
 
 	// self-test window: -VREF/2400 -> -3495 codes at gain 1; measured offsets are a few hundred uV (~ -2000 codes)
-	static constexpr std::int32_t test_expected = -8388608 / 2400;
+	static constexpr std::int32_t test_expected = -full_scale / 2400;
 	static constexpr std::int32_t test_min = -6500;
 	static constexpr std::int32_t test_max = -1000;
 

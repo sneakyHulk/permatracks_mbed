@@ -1,14 +1,18 @@
 #pragma once
 
 #include <H7Adc.h>
+#include <TemperatureDatapointRaw.h>
 
 #include <cstdint>
 
 // -----------------------------------------------------------------------------
 // MCP9700B — Microchip analog temperature sensor, read through an H7Adc.
 //
-// Transfer function: Vout = V0 + Tc * T, with V0 = 500 mV and Tc = 10 mV/°C.
-//   => T[°C] = (Vout - 0.5 V) / 0.01 V/°C
+// Transfer function: Vout = V0 + Tc * T, with V0 = 0.5 V and Tc = 0.01 V/°C.
+//   => T[°C] = raw / get_scale_factor() + get_offset()
+//      with 1 LSB = VREF / 4095 V
+//      scale  = full_scale * Tc / VREF = 4095 * 0.01 / 3.3 = 12.41 LSB per °C
+//      offset = -V0 / Tc = -50 °C
 //
 // One instance per sensor: the H7Adc for that pin's ADC plus the pin's channel
 // (ADC_CHANNEL_x, see the H7 pin map). The constructor enables the channel on
@@ -20,11 +24,15 @@ class MCP9700B final {
    public:
 	MCP9700B(H7Adc& adc, std::uint32_t const channel) : adc_(adc), channel_(channel) { adc_.enable(channel_); }
 
-	// Temperature in degrees Celsius from the last adc.read().
-	[[nodiscard]] double get_measurement() const { return (adc_.volts(channel_) - v0) / tc; }
+	// LSB per °C and offset in °C: T[°C] = datapoint / get_scale_factor() + get_offset().
+	static double get_scale_factor() { return H7Adc::full_scale * tc / H7Adc::vref; }
+	static double get_offset() { return -v0 / tc; }
 
-	// Raw 12-bit ADC code.
-	[[nodiscard]] std::uint16_t raw() const { return adc_.raw(channel_); }
+	// Raw 12-bit ADC code of the last adc.read(), packed for the serial frame.
+	[[nodiscard]] TemperatureDatapointRaw get_measurement() const { return TemperatureDatapointRaw{.datapoint = adc_.raw(channel_)}; }
+
+	// Temperature in degrees Celsius, for human-readable output.
+	[[nodiscard]] double get_celsius() const { return (adc_.volts(channel_) - v0) / tc; }
 
    private:
 	static constexpr double v0 = 0.5;   // MCP9700B output at 0 °C [V]

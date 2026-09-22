@@ -1,11 +1,17 @@
 #include <ADS131E08.h>
 #include <Arduino.h>
+#include <CRC16.h>
 #include <FLC100.h>
 #include <H7Adc.h>
 #include <HalSpi4.h>
 #include <MCP9700B.h>
+#include <MagneticFluxDensityDatapointRaw.h>
 #include <SPI.h>
+#include <TemperatureDatapointRaw.h>
+#include <common2_output.h>
 
+#include <array>
+#include <bit>
 #include <cstdint>
 
 static bool led_state = LOW;
@@ -18,15 +24,15 @@ static H7Adc tmp_adc1(ADC1);
 static H7Adc tmp_adc3(ADC3);
 
 // One MCP9700B per temperature channel: (its H7Adc, channel). Comments show the pin.
-static MCP9700B temp1(tmp_adc1, ADC_CHANNEL_16);   // PA0
-static MCP9700B temp2(tmp_adc1, ADC_CHANNEL_10);   // PC0
-static MCP9700B temp3(tmp_adc1, ADC_CHANNEL_11);   // PC1
-static MCP9700B temp4(tmp_adc3, ADC_CHANNEL_0);    // PC2_C
-static MCP9700B temp5(tmp_adc3, ADC_CHANNEL_1);    // PC3_C
-static MCP9700B temp6(tmp_adc1, ADC_CHANNEL_15);   // PA3
-static MCP9700B temp7(tmp_adc1, ADC_CHANNEL_14);   // PA2
-static MCP9700B temp8(tmp_adc1, ADC_CHANNEL_17);   // PA1
-static MCP9700B temp9(tmp_adc1, ADC_CHANNEL_18);   // PA4
+static MCP9700B temp01(tmp_adc1, ADC_CHANNEL_16);   // PA0
+static MCP9700B temp02(tmp_adc1, ADC_CHANNEL_10);   // PC0
+static MCP9700B temp03(tmp_adc1, ADC_CHANNEL_11);   // PC1
+static MCP9700B temp04(tmp_adc3, ADC_CHANNEL_0);    // PC2_C
+static MCP9700B temp05(tmp_adc3, ADC_CHANNEL_1);    // PC3_C
+static MCP9700B temp06(tmp_adc1, ADC_CHANNEL_15);   // PA3
+static MCP9700B temp07(tmp_adc1, ADC_CHANNEL_14);   // PA2
+static MCP9700B temp08(tmp_adc1, ADC_CHANNEL_17);   // PA1
+static MCP9700B temp09(tmp_adc1, ADC_CHANNEL_18);   // PA4
 static MCP9700B temp10(tmp_adc1, ADC_CHANNEL_3);   // PA6
 static MCP9700B temp11(tmp_adc1, ADC_CHANNEL_19);  // PA5
 static MCP9700B temp12(tmp_adc1, ADC_CHANNEL_7);   // PA7
@@ -43,22 +49,22 @@ static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, 
 
 // One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
 // ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
-static FLC100 mag1(mag_adc, 0);
-static FLC100 mag2(mag_adc, 1);
-static FLC100 mag3(mag_adc, 2);
-static FLC100 mag4(mag_adc, 3);
-static FLC100 mag5(mag_adc, 4);
-static FLC100 mag6(mag_adc, 5);
-static FLC100 mag7(mag_adc, 6);
-static FLC100 mag8(mag_adc, 7);
-static FLC100 mag9(mag_adc, 8);
-static FLC100 mag10(mag_adc, 9);
-static FLC100 mag11(mag_adc, 10);
-static FLC100 mag12(mag_adc, 11);
-static FLC100 mag13(mag_adc, 12);
-static FLC100 mag14(mag_adc, 13);
-static FLC100 mag15(mag_adc, 14);
-static FLC100 mag16(mag_adc, 15);
+static FLC100 flc01(mag_adc, 0);
+static FLC100 flc02(mag_adc, 1);
+static FLC100 flc03(mag_adc, 2);
+static FLC100 flc04(mag_adc, 3);
+static FLC100 flc05(mag_adc, 4);
+static FLC100 flc06(mag_adc, 5);
+static FLC100 flc07(mag_adc, 6);
+static FLC100 flc08(mag_adc, 7);
+static FLC100 flc09(mag_adc, 8);
+static FLC100 flc10(mag_adc, 9);
+static FLC100 flc11(mag_adc, 10);
+static FLC100 flc12(mag_adc, 11);
+static FLC100 flc13(mag_adc, 12);
+static FLC100 flc14(mag_adc, 13);
+static FLC100 flc15(mag_adc, 14);
+static FLC100 flc16(mag_adc, 15);
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -205,6 +211,13 @@ void setup() {
 	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
 	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
 
+	{  // how long do all temperature conversions take? (must stay well below the 1 ms mag frame period)
+		std::uint32_t const t0 = micros();
+		tmp_adc1.read();
+		tmp_adc3.read();
+		common2::println_time_loc(millis(), "'ADC1+ADC3' all 16 channels:", micros() - t0, "us (budget: 1000 us per mag frame)");
+	}
+
 	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
 	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
 	mag_adc.self_test();  // both chips on the internal test signal: all 16 channels ~ -3495 + offset, status words 0xC...
@@ -214,28 +227,130 @@ void setup() {
 void loop() {
 	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
 
-	tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
-	tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
+	{  // 'C' frame (Celsius; 'T' is the time sync marker): 'C' | scale (8 B) | offset (8 B) | 16 x TemperatureDatapointRaw (2 B) | timestamp (8 B, ns) | CRC16 (2 B) | 'C'
+		static CRC16 crc16(0x8005, 0, false, true, true);
 
-	char line[320];
-	snprintf(line, sizeof(line),
-	    "t=%lu.%03lu T1=%.1f T2=%.1f T3=%.1f T4=%.1f T5=%.1f T6=%.1f T7=%.1f T8=%.1f "
-	    "T9=%.1f T10=%.1f T11=%.1f T12=%.1f T13=%.1f T14=%.1f T15=%.1f T16=%.1f\n",
-	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp1.get_measurement(), temp2.get_measurement(), temp3.get_measurement(), temp4.get_measurement(), temp5.get_measurement(), temp6.get_measurement(),
-	    temp7.get_measurement(), temp8.get_measurement(), temp9.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(),
-	    temp16.get_measurement());
-	Serial.print(line);
+		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
+		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
 
-	mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
+		auto const tmp01 = temp01.get_measurement();
+		auto const tmp02 = temp02.get_measurement();
+		auto const tmp03 = temp03.get_measurement();
+		auto const tmp04 = temp04.get_measurement();
+		auto const tmp05 = temp05.get_measurement();
+		auto const tmp06 = temp06.get_measurement();
+		auto const tmp07 = temp07.get_measurement();
+		auto const tmp08 = temp08.get_measurement();
+		auto const tmp09 = temp09.get_measurement();
+		auto const tmp10 = temp10.get_measurement();
+		auto const tmp11 = temp11.get_measurement();
+		auto const tmp12 = temp12.get_measurement();
+		auto const tmp13 = temp13.get_measurement();
+		auto const tmp14 = temp14.get_measurement();
+		auto const tmp15 = temp15.get_measurement();
+		auto const tmp16 = temp16.get_measurement();
 
-	char mag_line[420];
-	snprintf(mag_line, sizeof(mag_line),
-	    "t=%lu.%03lu B1=%.3f B2=%.3f B3=%.3f B4=%.3f B5=%.3f B6=%.3f B7=%.3f B8=%.3f "
-	    "B9=%.3f B10=%.3f B11=%.3f B12=%.3f B13=%.3f B14=%.3f B15=%.3f B16=%.3f uT\n",
-	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), mag1.get_measurement(), mag2.get_measurement(), mag3.get_measurement(), mag4.get_measurement(), mag5.get_measurement(), mag6.get_measurement(),
-	    mag7.get_measurement(), mag8.get_measurement(), mag9.get_measurement(), mag10.get_measurement(), mag11.get_measurement(), mag12.get_measurement(), mag13.get_measurement(), mag14.get_measurement(), mag15.get_measurement(),
-	    mag16.get_measurement());
-	Serial.print(mag_line);
+		Serial.write(static_cast<std::uint8_t>('C'));
+
+		auto const scale_mcp = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(MCP9700B::get_scale_factor());  // LSB per degC, double
+		Serial.write(scale_mcp.data(), scale_mcp.size());
+		crc16.add(scale_mcp.data(), scale_mcp.size());
+
+		auto const offset_mcp = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(MCP9700B::get_offset());  // degC, double
+		Serial.write(offset_mcp.data(), offset_mcp.size());
+		crc16.add(offset_mcp.data(), offset_mcp.size());
+
+		// clang-format off
+		Serial.write(tmp01.bytes.data(), tmp01.bytes.size()); crc16.add(tmp01.bytes.data(), tmp01.bytes.size());
+		Serial.write(tmp02.bytes.data(), tmp02.bytes.size()); crc16.add(tmp02.bytes.data(), tmp02.bytes.size());
+		Serial.write(tmp03.bytes.data(), tmp03.bytes.size()); crc16.add(tmp03.bytes.data(), tmp03.bytes.size());
+		Serial.write(tmp04.bytes.data(), tmp04.bytes.size()); crc16.add(tmp04.bytes.data(), tmp04.bytes.size());
+		Serial.write(tmp05.bytes.data(), tmp05.bytes.size()); crc16.add(tmp05.bytes.data(), tmp05.bytes.size());
+		Serial.write(tmp06.bytes.data(), tmp06.bytes.size()); crc16.add(tmp06.bytes.data(), tmp06.bytes.size());
+		Serial.write(tmp07.bytes.data(), tmp07.bytes.size()); crc16.add(tmp07.bytes.data(), tmp07.bytes.size());
+		Serial.write(tmp08.bytes.data(), tmp08.bytes.size()); crc16.add(tmp08.bytes.data(), tmp08.bytes.size());
+		Serial.write(tmp09.bytes.data(), tmp09.bytes.size()); crc16.add(tmp09.bytes.data(), tmp09.bytes.size());
+		Serial.write(tmp10.bytes.data(), tmp10.bytes.size()); crc16.add(tmp10.bytes.data(), tmp10.bytes.size());
+		Serial.write(tmp11.bytes.data(), tmp11.bytes.size()); crc16.add(tmp11.bytes.data(), tmp11.bytes.size());
+		Serial.write(tmp12.bytes.data(), tmp12.bytes.size()); crc16.add(tmp12.bytes.data(), tmp12.bytes.size());
+		Serial.write(tmp13.bytes.data(), tmp13.bytes.size()); crc16.add(tmp13.bytes.data(), tmp13.bytes.size());
+		Serial.write(tmp14.bytes.data(), tmp14.bytes.size()); crc16.add(tmp14.bytes.data(), tmp14.bytes.size());
+		Serial.write(tmp15.bytes.data(), tmp15.bytes.size()); crc16.add(tmp15.bytes.data(), tmp15.bytes.size());
+		Serial.write(tmp16.bytes.data(), tmp16.bytes.size()); crc16.add(tmp16.bytes.data(), tmp16.bytes.size());
+		// clang-format on
+
+		std::uint64_t const timestamp = 1'000'000ULL * ms;  // SOF ms -> ns
+		auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
+		Serial.write(timestamp_.data(), timestamp_.size());
+		crc16.add(timestamp_.data(), timestamp_.size());
+
+		auto const crc_value = std::bit_cast<std::array<std::uint8_t, 2>>(crc16.calc());
+		Serial.write(crc_value.data(), crc_value.size());
+
+		Serial.write(static_cast<std::uint8_t>('C'));
+
+		crc16.restart();
+	}
+
+	{  // 'M' frame, same layout as mag-array-v2: 'M' | scale | 16 x MagneticFluxDensityDatapointRaw (3 B) | timestamp (8 B, ns) | CRC16 (2 B) | 'M'
+		static CRC16 crc16(0x8005, 0, false, true, true);
+
+		mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
+
+		auto const mag01 = flc01.get_measurement();
+		auto const mag02 = flc02.get_measurement();
+		auto const mag03 = flc03.get_measurement();
+		auto const mag04 = flc04.get_measurement();
+		auto const mag05 = flc05.get_measurement();
+		auto const mag06 = flc06.get_measurement();
+		auto const mag07 = flc07.get_measurement();
+		auto const mag08 = flc08.get_measurement();
+		auto const mag09 = flc09.get_measurement();
+		auto const mag10 = flc10.get_measurement();
+		auto const mag11 = flc11.get_measurement();
+		auto const mag12 = flc12.get_measurement();
+		auto const mag13 = flc13.get_measurement();
+		auto const mag14 = flc14.get_measurement();
+		auto const mag15 = flc15.get_measurement();
+		auto const mag16 = flc16.get_measurement();
+
+		Serial.write(static_cast<std::uint8_t>('M'));
+
+		auto const scale_flc = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(FLC100<ADS131E08<true>>::get_scale_factor());  // LSB per tesla, double
+		Serial.write(scale_flc.data(), scale_flc.size());
+		crc16.add(scale_flc.data(), scale_flc.size());
+
+		// clang-format off
+		Serial.write(mag01.bytes.data(), mag01.bytes.size()); crc16.add(mag01.bytes.data(), mag01.bytes.size());
+		Serial.write(mag02.bytes.data(), mag02.bytes.size()); crc16.add(mag02.bytes.data(), mag02.bytes.size());
+		Serial.write(mag03.bytes.data(), mag03.bytes.size()); crc16.add(mag03.bytes.data(), mag03.bytes.size());
+		Serial.write(mag04.bytes.data(), mag04.bytes.size()); crc16.add(mag04.bytes.data(), mag04.bytes.size());
+		Serial.write(mag05.bytes.data(), mag05.bytes.size()); crc16.add(mag05.bytes.data(), mag05.bytes.size());
+		Serial.write(mag06.bytes.data(), mag06.bytes.size()); crc16.add(mag06.bytes.data(), mag06.bytes.size());
+		Serial.write(mag07.bytes.data(), mag07.bytes.size()); crc16.add(mag07.bytes.data(), mag07.bytes.size());
+		Serial.write(mag08.bytes.data(), mag08.bytes.size()); crc16.add(mag08.bytes.data(), mag08.bytes.size());
+		Serial.write(mag09.bytes.data(), mag09.bytes.size()); crc16.add(mag09.bytes.data(), mag09.bytes.size());
+		Serial.write(mag10.bytes.data(), mag10.bytes.size()); crc16.add(mag10.bytes.data(), mag10.bytes.size());
+		Serial.write(mag11.bytes.data(), mag11.bytes.size()); crc16.add(mag11.bytes.data(), mag11.bytes.size());
+		Serial.write(mag12.bytes.data(), mag12.bytes.size()); crc16.add(mag12.bytes.data(), mag12.bytes.size());
+		Serial.write(mag13.bytes.data(), mag13.bytes.size()); crc16.add(mag13.bytes.data(), mag13.bytes.size());
+		Serial.write(mag14.bytes.data(), mag14.bytes.size()); crc16.add(mag14.bytes.data(), mag14.bytes.size());
+		Serial.write(mag15.bytes.data(), mag15.bytes.size()); crc16.add(mag15.bytes.data(), mag15.bytes.size());
+		Serial.write(mag16.bytes.data(), mag16.bytes.size()); crc16.add(mag16.bytes.data(), mag16.bytes.size());
+		// clang-format on
+
+		std::uint64_t const timestamp = 1'000'000ULL * ms;  // SOF ms -> ns, same 8-byte field as v2
+		auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
+		Serial.write(timestamp_.data(), timestamp_.size());
+		crc16.add(timestamp_.data(), timestamp_.size());
+
+		auto const crc_value = std::bit_cast<std::array<std::uint8_t, 2>>(crc16.calc());
+		Serial.write(crc_value.data(), crc_value.size());
+
+		Serial.write(static_cast<std::uint8_t>('M'));
+
+		crc16.restart();
+	}
 
 	delay(1000);
 }
