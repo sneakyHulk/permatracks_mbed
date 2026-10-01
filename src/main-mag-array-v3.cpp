@@ -24,15 +24,15 @@ static H7Adc tmp_adc1(ADC1);
 static H7Adc tmp_adc3(ADC3);
 
 // One MCP9700B per temperature channel: (its H7Adc, channel). Comments show the pin.
-static MCP9700B temp01(tmp_adc1, ADC_CHANNEL_16);   // PA0
-static MCP9700B temp02(tmp_adc1, ADC_CHANNEL_10);   // PC0
-static MCP9700B temp03(tmp_adc1, ADC_CHANNEL_11);   // PC1
-static MCP9700B temp04(tmp_adc3, ADC_CHANNEL_0);    // PC2_C
-static MCP9700B temp05(tmp_adc3, ADC_CHANNEL_1);    // PC3_C
-static MCP9700B temp06(tmp_adc1, ADC_CHANNEL_15);   // PA3
-static MCP9700B temp07(tmp_adc1, ADC_CHANNEL_14);   // PA2
-static MCP9700B temp08(tmp_adc1, ADC_CHANNEL_17);   // PA1
-static MCP9700B temp09(tmp_adc1, ADC_CHANNEL_18);   // PA4
+static MCP9700B temp01(tmp_adc1, ADC_CHANNEL_16);  // PA0
+static MCP9700B temp02(tmp_adc1, ADC_CHANNEL_10);  // PC0
+static MCP9700B temp03(tmp_adc1, ADC_CHANNEL_11);  // PC1
+static MCP9700B temp04(tmp_adc3, ADC_CHANNEL_0);   // PC2_C
+static MCP9700B temp05(tmp_adc3, ADC_CHANNEL_1);   // PC3_C
+static MCP9700B temp06(tmp_adc1, ADC_CHANNEL_15);  // PA3
+static MCP9700B temp07(tmp_adc1, ADC_CHANNEL_14);  // PA2
+static MCP9700B temp08(tmp_adc1, ADC_CHANNEL_17);  // PA1
+static MCP9700B temp09(tmp_adc1, ADC_CHANNEL_18);  // PA4
 static MCP9700B temp10(tmp_adc1, ADC_CHANNEL_3);   // PA6
 static MCP9700B temp11(tmp_adc1, ADC_CHANNEL_19);  // PA5
 static MCP9700B temp12(tmp_adc1, ADC_CHANNEL_7);   // PA7
@@ -44,27 +44,27 @@ static MCP9700B temp16(tmp_adc1, ADC_CHANNEL_5);   // PB1
 // --- Magnetometers: TWO daisy-chained ADS131E08 (16 channels) on SPI4 ---
 // SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
 // Arduino pin NUMBERS (PE4, not PE_4): the PinName values are off by 2 on this variant.
-static HalSpi4 spi4;  // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
+static HalSpi4 spi4;                                               // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
 static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 1 kSPS, 24-bit, VREF=4.096 V
 
 // One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
 // ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
-static FLC100 flc01(mag_adc, 0);
-static FLC100 flc02(mag_adc, 1);
-static FLC100 flc03(mag_adc, 2);
-static FLC100 flc04(mag_adc, 3);
-static FLC100 flc05(mag_adc, 4);
-static FLC100 flc06(mag_adc, 5);
-static FLC100 flc07(mag_adc, 6);
-static FLC100 flc08(mag_adc, 7);
-static FLC100 flc09(mag_adc, 8);
-static FLC100 flc10(mag_adc, 9);
-static FLC100 flc11(mag_adc, 10);
-static FLC100 flc12(mag_adc, 11);
-static FLC100 flc13(mag_adc, 12);
-static FLC100 flc14(mag_adc, 13);
-static FLC100 flc15(mag_adc, 14);
-static FLC100 flc16(mag_adc, 15);
+static FLC100 flc01(mag_adc, 7);
+static FLC100 flc02(mag_adc, 6);
+static FLC100 flc03(mag_adc, 5);
+static FLC100 flc04(mag_adc, 4);
+static FLC100 flc05(mag_adc, 3);
+static FLC100 flc06(mag_adc, 2);
+static FLC100 flc07(mag_adc, 1);
+static FLC100 flc08(mag_adc, 0);
+static FLC100 flc09(mag_adc, 15);
+static FLC100 flc10(mag_adc, 14);
+static FLC100 flc11(mag_adc, 13);
+static FLC100 flc12(mag_adc, 12);
+static FLC100 flc13(mag_adc, 11);
+static FLC100 flc14(mag_adc, 10);
+static FLC100 flc15(mag_adc, 9);
+static FLC100 flc16(mag_adc, 8);
 
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
@@ -224,7 +224,8 @@ void setup() {
 	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
 }
 
-void loop() {
+// Binary output: one 'C' (temperature) and one 'M' (magnetic) CRC16 frame per mag sample, for the parser.
+static void loop_frames() {
 	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
 
 	{  // 'C' frame (Celsius; 'T' is the time sync marker): 'C' | scale (8 B) | offset (8 B) | 16 x TemperatureDatapointRaw (2 B) | timestamp (8 B, ns) | CRC16 (2 B) | 'C'
@@ -351,6 +352,34 @@ void loop() {
 
 		crc16.restart();
 	}
+}
+
+// Human-readable output: temperature in degC and magnetic flux density in uT, one line each, once per second.
+static void loop_print() {
+	std::uint32_t const ms = sof_ms();
+
+	tmp_adc1.read();
+	tmp_adc3.read();
+	mag_adc.read();
+
+	char line[320];
+	snprintf(line, sizeof(line),
+	    "t=%lu.%03lu T01=%.1f T02=%.1f T03=%.1f T04=%.1f T05=%.1f T06=%.1f T07=%.1f T08=%.1f "
+	    "T09=%.1f T10=%.1f T11=%.1f T12=%.1f T13=%.1f T14=%.1f T15=%.1f T16=%.1f degC\n",
+	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp01.get_celsius(), temp02.get_celsius(), temp03.get_celsius(), temp04.get_celsius(), temp05.get_celsius(), temp06.get_celsius(), temp07.get_celsius(),
+	    temp08.get_celsius(), temp09.get_celsius(), temp10.get_celsius(), temp11.get_celsius(), temp12.get_celsius(), temp13.get_celsius(), temp14.get_celsius(), temp15.get_celsius(), temp16.get_celsius());
+	Serial.print(line);
+
+	char mag_line[420];
+	snprintf(mag_line, sizeof(mag_line),
+	    "t=%lu.%03lu B01=%.3f B02=%.3f B03=%.3f B04=%.3f B05=%.3f B06=%.3f B07=%.3f B08=%.3f "
+	    "B09=%.3f B10=%.3f B11=%.3f B12=%.3f B13=%.3f B14=%.3f B15=%.3f B16=%.3f uT\n",
+	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), flc01.get_tesla() * 1e6, flc02.get_tesla() * 1e6, flc03.get_tesla() * 1e6, flc04.get_tesla() * 1e6, flc05.get_tesla() * 1e6, flc06.get_tesla() * 1e6,
+	    flc07.get_tesla() * 1e6, flc08.get_tesla() * 1e6, flc09.get_tesla() * 1e6, flc10.get_tesla() * 1e6, flc11.get_tesla() * 1e6, flc12.get_tesla() * 1e6, flc13.get_tesla() * 1e6, flc14.get_tesla() * 1e6, flc15.get_tesla() * 1e6,
+	    flc16.get_tesla() * 1e6);
+	Serial.print(mag_line);
 
 	delay(1000);
 }
+
+void loop() { loop_print(); }
