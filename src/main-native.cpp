@@ -21,7 +21,9 @@
 #include <IOKit/usb/IOUSBLib.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <mach/mach.h>
 #include <mach/mach_time.h>
+#include <mach/thread_policy.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -156,8 +158,24 @@ static int open_serial(std::string const& port) {
 	return fd;
 }
 
+// Real-time thread priority (like CoreAudio threads): the scheduler wakes this thread right away
+// on a performance core, so read() returns with less OS latency. Expects to run ~0.1 ms every 1 ms.
+static bool set_realtime_priority() {
+	mach_timebase_info_data_t tb;
+	mach_timebase_info(&tb);
+	auto const ns_to_abs = [&](std::uint64_t const ns) { return static_cast<std::uint32_t>(ns * tb.denom / tb.numer); };
+
+	thread_time_constraint_policy_data_t policy;
+	policy.period = ns_to_abs(1'000'000);      // 1 ms (= one 'T' frame)
+	policy.computation = ns_to_abs(100'000);   // ~0.1 ms of work per period
+	policy.constraint = ns_to_abs(1'000'000);  // must be done within the period
+	policy.preemptible = true;
+	return thread_policy_set(mach_thread_self(), THREAD_TIME_CONSTRAINT_POLICY, reinterpret_cast<thread_policy_t>(&policy), THREAD_TIME_CONSTRAINT_POLICY_COUNT) == KERN_SUCCESS;
+}
+
 int main(int argc, char** argv) {
 	std::setvbuf(stdout, nullptr, _IOLBF, 0);  // line-buffered also when piped
+	if (!set_realtime_priority()) std::fprintf(stderr, "warning: real-time priority not granted\n");
 	std::string const port = argc > 1 ? argv[1] : find_port();
 	int const fd = port.empty() ? -1 : open_serial(port);
 	if (fd < 0) {
