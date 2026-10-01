@@ -3,10 +3,15 @@
 // IOKit GetBusFrameNumberWithTime returns a recent USB bus frame number plus the host
 // time at the START of that frame (jitter <= 200 µs). That pair is sent to the device (= poll_sync() there):
 //
-//   'S' | frame (uint16, 11-bit USB frame number) | unix_us (uint64, system_clock at that frame) | 'S'
+//   'S' | frame (uint16, 11-bit USB frame number) | unix_ns (uint64, system_clock at that frame) | CRC8 | 'S'
 //
-// Then every line the device prints (ISO time) is shown next to the host's ISO time.
-// Re-syncs once per minute.
+// The device answers once per ms with
+//
+//   'T' | timestamp (uint64, unix ns) | CRC8 | 'T'
+//
+// (same framing as the 'C'/'M' frames; CRC8 = poly 0x07). Each timestamp
+// is shown as ISO time next to the host's ISO time at reception.
+// Re-syncs every 10 s.
 //
 // usage: native [/dev/cu.usbmodemXXXX]   (default: first /dev/cu.usbmodem*)
 
@@ -21,6 +26,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <boost/crc.hpp>
+
 #include <array>
 #include <bit>
 #include <chrono>
@@ -29,6 +36,7 @@
 #include <cstring>
 #include <ctime>
 #include <string>
+#include <vector>
 
 static constexpr char const* product_name = "PERMATRACKS V3";
 
@@ -77,6 +85,8 @@ static bool bus_frame_now(IOUSBDeviceInterface300** dev, std::uint64_t& frame, s
 	return true;
 }
 
+using crc_8_type = boost::crc_optimal<8, 0x07, 0, 0, false, false>;  // = robtillaart CRC8(0x07, 0, 0, false, false)
+
 static std::string iso(std::uint64_t const unix_us) {
 	std::time_t const sec = static_cast<std::time_t>(unix_us / 1'000'000);
 	std::tm tm{};
@@ -91,24 +101,37 @@ static bool send_sync(int const fd, IOUSBDeviceInterface300** dev) {
 	if (!bus_frame_now(dev, frame, unix_us)) return false;
 
 	std::uint16_t const f11 = frame & 0x7FF;
-	std::array<std::uint8_t, 12> msg{};
+	std::uint64_t const unix_ns = unix_us * 1000;
+	std::array<std::uint8_t, 13> msg{};
 	msg[0] = 'S';
 	std::memcpy(msg.data() + 1, &f11, 2);
-	std::memcpy(msg.data() + 3, &unix_us, 8);
-	msg[11] = 'S';
+	std::memcpy(msg.data() + 3, &unix_ns, 8);
+	crc_8_type crc;
+	crc.process_bytes(msg.data() + 1, 10);
+	msg[11] = crc.checksum();
+	msg[12] = 'S';
 	std::printf("--- SYNC: bus frame %llu (11 bit: %u) = %s ---\n", static_cast<unsigned long long>(frame), f11, iso(unix_us).c_str());
 	return write(fd, msg.data(), msg.size()) == static_cast<ssize_t>(msg.size());
 }
 
-// Parse the device's "YYYY-MM-DDTHH:MM:SS.ffffffZ" back into unix µs.
-static bool parse_iso(std::string const& line, std::uint64_t& unix_us) {
-	std::tm tm{};
-	unsigned long frac = 0;
-	if (std::sscanf(line.c_str(), "%d-%d-%dT%d:%d:%d.%6luZ", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &frac) != 7) return false;
-	tm.tm_year -= 1900;
-	tm.tm_mon -= 1;
-	unix_us = static_cast<std::uint64_t>(timegm(&tm)) * 1'000'000 + frac;
-	return true;
+// Extract 'T' | timestamp (uint64, ns) | CRC8 | 'T' frames from the byte stream; unparsed rest stays in buf.
+static void parse_time_frames(std::vector<std::uint8_t>& buf, std::vector<std::uint64_t>& timestamps_ns) {
+	constexpr std::size_t frame_len = 11;
+	std::size_t i = 0;
+	while (buf.size() - i >= frame_len) {
+		std::uint8_t const* f = buf.data() + i;
+		crc_8_type crc;
+		crc.process_bytes(f + 1, 8);
+		if (f[0] != 'T' || f[10] != 'T' || crc.checksum() != f[9]) {
+			++i;  // resync byte by byte
+			continue;
+		}
+		std::uint64_t ts;
+		std::memcpy(&ts, f + 1, 8);
+		timestamps_ns.push_back(ts);
+		i += frame_len;
+	}
+	buf.erase(buf.begin(), buf.begin() + static_cast<std::ptrdiff_t>(i));
 }
 
 static std::string find_port() {
@@ -153,11 +176,12 @@ int main(int argc, char** argv) {
 		std::fprintf(stderr, "sync failed\n");
 		return EXIT_FAILURE;
 	}
-	auto next_sync = std::chrono::steady_clock::now() + std::chrono::minutes(1);
+	auto next_sync = std::chrono::steady_clock::now() + std::chrono::seconds(10);
 	auto next_print = std::chrono::steady_clock::now();
 
-	std::string line;
-	std::array<char, 4096> rx;
+	std::vector<std::uint8_t> buf;
+	std::vector<std::uint64_t> timestamps_ns;
+	std::array<std::uint8_t, 4096> rx;
 	while (true) {
 		ssize_t const got = read(fd, rx.data(), rx.size());
 		if (got <= 0) {
@@ -166,22 +190,22 @@ int main(int argc, char** argv) {
 		}
 		std::uint64_t const host_us = unix_us_now();
 
-		for (ssize_t i = 0; i < got; ++i) {
-			if (rx[i] == '\n') {
-				// diff = host receive time - board timestamp (µs); must be > 0 (= transfer latency + sync error)
-				if (std::uint64_t dev_us = 0; std::chrono::steady_clock::now() >= next_print && parse_iso(line, dev_us)) {  // 10 lines per second
-					next_print = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
-					std::printf("device %s   host %s   diff %+lld us\n", line.c_str(), iso(host_us).c_str(), static_cast<long long>(host_us - dev_us));
-				}
-				line.clear();
-			} else if (rx[i] != '\r') {
-				line += rx[i];
+		buf.insert(buf.end(), rx.begin(), rx.begin() + got);
+		timestamps_ns.clear();
+		parse_time_frames(buf, timestamps_ns);
+
+		for (std::uint64_t const ts : timestamps_ns) {
+			// diff = host receive time - board timestamp (µs); must be > 0 (= transfer latency + sync error)
+			if (std::chrono::steady_clock::now() >= next_print) {  // 10 lines per second
+				next_print = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+				std::uint64_t const dev_us = ts / 1000;
+				std::printf("device %s   host %s   diff %+lld us\n", iso(dev_us).c_str(), iso(host_us).c_str(), static_cast<long long>(host_us - dev_us));
 			}
 		}
 
 		if (std::chrono::steady_clock::now() >= next_sync) {
 			send_sync(fd, dev);
-			next_sync += std::chrono::minutes(1);
+			next_sync += std::chrono::seconds(10);
 		}
 	}
 }
