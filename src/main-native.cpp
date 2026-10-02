@@ -1,17 +1,20 @@
-// Host side of main-time.cpp (macOS): syncs the device's sof_micros() to std::chrono::system_clock.
+// Host side of main-time.cpp (macOS): syncs the device's sof_ns() to the host's mach clock (shown as system_clock wall time).
 //
-// IOKit GetBusFrameNumberWithTime returns a recent USB bus frame number plus the host
-// time at the START of that frame (jitter <= 200 µs). That pair is sent to the device (= poll_sync() there):
+// IOKit GetBusFrameNumberWithTime returns a recent USB bus frame number plus the host mach time
+// at the START of that frame (jitter up to a few 100 µs). A sampler thread takes such a pair every
+// time the frame number has just advanced, and every 30 s fits a line frame -> mach ns through them:
+// slope = real length of one USB frame in mach time, line = jitter-free time of the newest frame.
+// Both go to the device (= poll_sync() there):
 //
-//   'S' | frame (uint16, 11-bit USB frame number) | unix_ns (uint64, system_clock at that frame) | CRC8 | 'S'
+//   'S' | frame (uint16, 11-bit) | mach_ns (uint64, start of that frame) | ps_per_frame (uint32) | CRC8 | 'S'
 //
-// The device answers once per ms with
+// (first sync right at start from one fresh sample with nominal 1 ms, then every 30 s from the fit).
+// The device answers with
 //
-//   'T' | timestamp (uint64, unix ns) | CRC8 | 'T'
+//   'T' | timestamp (uint64, mach ns) | CRC8 | 'T'
 //
-// (same framing as the 'C'/'M' frames; CRC8 = poly 0x07). Each timestamp
-// is shown as ISO time next to the host's ISO time at reception.
-// Re-syncs every 10 s.
+// (same framing as the 'C'/'M' frames; CRC8 = poly 0x07). Shown: diff = arrival - timestamp on the mach
+// clock, then both as ISO wall time (same system_clock offset for both).
 //
 // usage: native [/dev/cu.usbmodemXXXX]   (default: first /dev/cu.usbmodem*)
 
@@ -31,6 +34,9 @@
 #include <boost/crc.hpp>
 
 #include <array>
+#include <atomic>
+#include <cmath>
+#include <thread>
 #include <bit>
 #include <chrono>
 #include <cstdint>
@@ -68,22 +74,40 @@ static IOUSBDeviceInterface300** find_usb_device(char const* name) {
 	return dev;
 }
 
-static std::uint64_t unix_us_now() { return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count(); }
+// mach_absolute_time ticks (e.g. IOKit's AbsoluteTime) -> ns of the mach clock (monotonic, not steered by NTP).
+static std::uint64_t mach_ns(std::uint64_t const mach_ticks) {
+	static mach_timebase_info_data_t const tb = [] {
+		mach_timebase_info_data_t t;
+		mach_timebase_info(&t);
+		return t;
+	}();
+	return static_cast<std::uint64_t>(static_cast<__uint128_t>(mach_ticks) * tb.numer / tb.denom);
+}
 
-// Current bus frame and its system_clock time in µs.
-static bool bus_frame_now(IOUSBDeviceInterface300** dev, std::uint64_t& frame, std::uint64_t& unix_us) {
+// system_clock - mach clock (ns), only to DISPLAY mach timestamps as wall time. Mach time read before and
+// after system_clock::now(), the tightest of a few tries wins (a preemption in between is not taken).
+static std::int64_t system_minus_mach_ns() {
+	std::uint64_t best_width = ~0ull;
+	std::int64_t offset = 0;
+	for (int i = 0; i < 5; ++i) {
+		std::uint64_t const m0 = mach_absolute_time();
+		auto const sys = std::chrono::system_clock::now();
+		std::uint64_t const m1 = mach_absolute_time();
+		if (m1 - m0 < best_width) {
+			best_width = m1 - m0;
+			offset = std::chrono::duration_cast<std::chrono::nanoseconds>(sys.time_since_epoch()).count() - static_cast<std::int64_t>(mach_ns(m0 + (m1 - m0) / 2));
+		}
+	}
+	return offset;
+}
+
+// Recent bus frame and the mach time at the start of that frame (IOKit: jitter up to 200 µs).
+static bool bus_frame_now(IOUSBDeviceInterface300** dev, std::uint64_t& frame, std::uint64_t& at_mach_ticks) {
 	UInt64 f = 0;
 	AbsoluteTime at{};
 	if ((*dev)->GetBusFrameNumberWithTime(dev, &f, &at) != kIOReturnSuccess) return false;
-
-	// AbsoluteTime is mach_absolute_time ticks -> shift it onto system_clock
-	mach_timebase_info_data_t tb;
-	mach_timebase_info(&tb);
-	std::uint64_t const age_ticks = mach_absolute_time() - std::bit_cast<std::uint64_t>(at);
-	std::uint64_t const age_us = age_ticks * tb.numer / tb.denom / 1000;
-
 	frame = f;
-	unix_us = unix_us_now() - age_us;
+	at_mach_ticks = std::bit_cast<std::uint64_t>(at);
 	return true;
 }
 
@@ -98,22 +122,83 @@ static std::string iso(std::uint64_t const unix_us) {
 	return s;
 }
 
-static bool send_sync(int const fd, IOUSBDeviceInterface300** dev) {
-	std::uint64_t frame = 0, unix_us = 0;
-	if (!bus_frame_now(dev, frame, unix_us)) return false;
+// set by the sampler thread at each sync, read by the main thread for the display
+static std::atomic<std::uint64_t> last_sync_ns{0};             // mach ns of the synced frame start -> the device's frame grid
+static std::atomic<std::uint32_t> last_ps_per_frame{1'000'000'000};
+static std::atomic<std::int64_t> display_offset_ns{0};         // system_clock - mach, same for device and host timestamps
 
+// 'S' | frame (uint16, 11 bit) | mach_ns (uint64) | ps_per_frame (uint32) | CRC8 | 'S'
+static bool send_sync(int const fd, std::uint64_t const frame, std::uint64_t const sync_ns, std::uint32_t const ps_per_frame) {
 	std::uint16_t const f11 = frame & 0x7FF;
-	std::uint64_t const unix_ns = unix_us * 1000;
-	std::array<std::uint8_t, 13> msg{};
+	std::array<std::uint8_t, 17> msg{};
 	msg[0] = 'S';
 	std::memcpy(msg.data() + 1, &f11, 2);
-	std::memcpy(msg.data() + 3, &unix_ns, 8);
+	std::memcpy(msg.data() + 3, &sync_ns, 8);
+	std::memcpy(msg.data() + 11, &ps_per_frame, 4);
 	crc_8_type crc;
-	crc.process_bytes(msg.data() + 1, 10);
-	msg[11] = crc.checksum();
-	msg[12] = 'S';
-	std::printf("--- SYNC: bus frame %llu (11 bit: %u) = %s ---\n", static_cast<unsigned long long>(frame), f11, iso(unix_us).c_str());
+	crc.process_bytes(msg.data() + 1, 14);
+	msg[15] = crc.checksum();
+	msg[16] = 'S';
+
+	display_offset_ns = system_minus_mach_ns();
+	last_sync_ns = sync_ns;
+	last_ps_per_frame = ps_per_frame;
+	std::printf("--- SYNC: bus frame %llu (11 bit: %u) = mach %llu ns = %s, frame = %.3f ns (%+.3f ppm) ---\n", static_cast<unsigned long long>(frame), f11, static_cast<unsigned long long>(sync_ns),
+	    iso((sync_ns + display_offset_ns) / 1000).c_str(), ps_per_frame / 1000.0, (ps_per_frame / 1e9 - 1.0) * 1e6);
 	return write(fd, msg.data(), msg.size()) == static_cast<ssize_t>(msg.size());
+}
+
+struct FrameSample {
+	std::uint64_t frame;
+	std::uint64_t ns;  // mach ns at the start of that frame
+};
+
+// Poll GetBusFrameNumberWithTime until the frame number advances, so the pair belongs to a frame that just started.
+static bool fresh_frame(IOUSBDeviceInterface300** dev, FrameSample& out) {
+	std::uint64_t first = 0, frame = 0, at = 0;
+	if (!bus_frame_now(dev, first, at)) return false;
+	do {
+		usleep(50);
+		if (!bus_frame_now(dev, frame, at)) return false;
+	} while (frame == first);
+	out = {frame, mach_ns(at)};
+	return true;
+}
+
+// Least-squares line through (frame, ns): returns ns per frame and the line's value at frame `at_frame`.
+static void fit_line(std::vector<FrameSample> const& samples, std::uint64_t const at_frame, double& ns_per_frame, std::uint64_t& ns_at_frame) {
+	std::uint64_t const f0 = samples.front().frame, t0 = samples.front().ns;
+	double sx = 0, sy = 0, sxx = 0, sxy = 0;
+	for (FrameSample const& s : samples) {
+		double const x = static_cast<double>(s.frame - f0);
+		double const y = static_cast<double>(static_cast<std::int64_t>(s.ns - t0));
+		sx += x;
+		sy += y;
+		sxx += x * x;
+		sxy += x * y;
+	}
+	double const n = static_cast<double>(samples.size());
+	ns_per_frame = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+	double const intercept = (sy - ns_per_frame * sx) / n;
+	ns_at_frame = t0 + static_cast<std::uint64_t>(std::llround(intercept + ns_per_frame * static_cast<double>(at_frame - f0)));
+}
+
+// Sampler thread: one fresh (frame, time) pair per frame, fit + sync every 30 s.
+static void sync_loop(int const fd, IOUSBDeviceInterface300** dev) {
+	std::vector<FrameSample> samples;
+	auto window_end = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+	while (true) {
+		if (FrameSample s; fresh_frame(dev, s)) samples.push_back(s);
+		if (std::chrono::steady_clock::now() < window_end || samples.size() < 100) continue;
+
+		double ns_per_frame = 0;
+		std::uint64_t ns_at_last = 0;
+		fit_line(samples, samples.back().frame, ns_per_frame, ns_at_last);
+		send_sync(fd, samples.back().frame, ns_at_last, static_cast<std::uint32_t>(std::llround(ns_per_frame * 1000)));
+
+		samples.clear();
+		window_end += std::chrono::seconds(30);
+	}
 }
 
 // Extract 'T' | timestamp (uint64, ns) | CRC8 | 'T' frames from the byte stream; unparsed rest stays in buf.
@@ -190,11 +275,11 @@ int main(int argc, char** argv) {
 	}
 
 	usleep(100'000);  // let the device see DTR and start printing
-	if (!send_sync(fd, dev)) {
+	if (FrameSample first; !fresh_frame(dev, first) || !send_sync(fd, first.frame, first.ns, 1'000'000'000)) {  // first sync: nominal 1 ms per frame
 		std::fprintf(stderr, "sync failed\n");
 		return EXIT_FAILURE;
 	}
-	auto next_sync = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+	std::thread(sync_loop, fd, dev).detach();  // refined sync every 30 s
 	auto next_print = std::chrono::steady_clock::now();
 
 	std::vector<std::uint8_t> buf;
@@ -206,24 +291,21 @@ int main(int argc, char** argv) {
 			std::perror("read");
 			return EXIT_FAILURE;
 		}
-		std::uint64_t const host_us = unix_us_now();
+		std::uint64_t const host_ns = mach_ns(mach_absolute_time());  // arrival, on the mach clock
 
 		buf.insert(buf.end(), rx.begin(), rx.begin() + got);
 		timestamps_ns.clear();
 		parse_time_frames(buf, timestamps_ns);
 
-		for (std::uint64_t const ts : timestamps_ns) {
-			// diff = host receive time - board timestamp (µs); must be > 0 (= transfer latency + sync error)
-			if (std::chrono::steady_clock::now() >= next_print) {  // 10 lines per second
-				next_print = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
-				std::uint64_t const dev_us = ts / 1000;
-				std::printf("device %s   host %s   diff %+lld us\n", iso(dev_us).c_str(), iso(host_us).c_str(), static_cast<long long>(host_us - dev_us));
-			}
-		}
-
-		if (std::chrono::steady_clock::now() >= next_sync) {
-			send_sync(fd, dev);
-			next_sync += std::chrono::seconds(10);
+		// Only the LAST 'T' of this read() arrived at host_ns; earlier ones in the same chunk were already waiting in the buffer.
+		// diff = host mach time when this 'T' arrived - board timestamp (mach ns); both then shown as wall time with the same offset
+		// sub  = time since the start of the device's frame (TIM8 part), from the frame grid set by the last sync
+		if (!timestamps_ns.empty() && std::chrono::steady_clock::now() >= next_print) {  // 10 lines per second
+			next_print = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+			std::uint64_t const ts = timestamps_ns.back();
+			std::int64_t const diff_ns = static_cast<std::int64_t>(host_ns - ts);
+			std::uint64_t const sub_ns = static_cast<std::uint64_t>(static_cast<__uint128_t>(ts - last_sync_ns) * 1000 % last_ps_per_frame / 1000);
+			std::printf("diff %+8.1f us   device %s   host %s   sub %6.1f us\n", diff_ns / 1000.0, iso((ts + display_offset_ns) / 1000).c_str(), iso((host_ns + display_offset_ns) / 1000).c_str(), sub_ns / 1000.0);
 		}
 	}
 }

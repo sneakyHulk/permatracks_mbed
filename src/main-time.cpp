@@ -1,4 +1,4 @@
-// sof_ns(): unix timestamp in ns, driven by the host's USB SOF (1 per ms).
+// sof_ns(): host timestamp in ns (the host's mach clock), driven by the host's USB SOF (1 per ms).
 //
 // ms     : TIM5 counts SOFs in hardware (+1 per ms, locked to the host clock).
 // sub-ms : TIM5 passes every SOF on (TRGO) to TIM8, which is reset by it -> TIM8->CNT = ticks since the last SOF.
@@ -6,10 +6,11 @@
 // Frames use the 'C'/'M' protocol: marker | payload | CRC | marker, little endian.
 // CRC8 = poly 0x07 (robtillaart CRC8 defaults = boost::crc_optimal<8, 0x07, 0, 0, false, false>).
 //
-// Host sync (13 bytes):  'S' | frame (uint16, 11-bit USB frame number) | unix_ns (uint64, host time at that frame) | CRC8  | 'S'
-// Output   (11 bytes):  'T' | timestamp (uint64, unix ns) | CRC8  | 'T'   every 0.5..1.5 ms (random)
+// Host sync (17 bytes):  'S' | frame (uint16, 11-bit USB frame number) | host_ns (uint64, host time at the start of that frame)
+//                            | ps_per_frame (uint32, measured length of one USB frame in host time) | CRC8 | 'S'
+// Output   (11 bytes):  'T' | timestamp (uint64, host ns) | CRC8  | 'T'   every 0.5..1.5 ms (random)
 //
-// After a sync sof_ns() = unix time of that frame + (frames since that frame) * 1 ms + time since the last SOF.
+// After a sync sof_ns() = host time of that frame + (frames since that frame + time since the last SOF) * frame length.
 
 #include <Arduino.h>
 #include <CRC8.h>
@@ -61,47 +62,53 @@ static void subms_timer_calibrate() {
 	ticks_per_ms = max_cnt;
 }
 
-static std::uint64_t base_ns = 0;  // unix ns at the start of TIM5 count base_cnt
+static std::uint64_t base_ns = 0;  // host ns at the start of TIM5 count base_cnt
 static std::uint32_t base_cnt = 0;
+static std::uint32_t ps_per_frame = 1'000'000'000;  // length of one USB frame in host time (ps); nominal 1 ms until synced
 
 static std::uint64_t sof_ns() {
 	std::uint32_t const ms = TIM5->CNT;
 	std::uint32_t const ticks = TIM8->CNT;
-	return base_ns + static_cast<std::uint64_t>(ms - base_cnt) * 1'000'000 + static_cast<std::uint64_t>(ticks) * 1'000'000 / ticks_per_ms;
+	std::uint64_t const frames_ps = static_cast<std::uint64_t>(ms - base_cnt) * ps_per_frame;
+	std::uint64_t const sub_ps = static_cast<std::uint64_t>(ticks) * ps_per_frame / ticks_per_ms;
+	return base_ns + (frames_ps + sub_ps) / 1000;
 }
 
-// host frame f11 had host time unix_ns
-static void sof_sync(std::uint16_t const f11, std::uint64_t const unix_ns) {
+// host frame f11 started at host time host_ns; one frame lasts ps_per_frame_ in host time
+static void sof_sync(std::uint16_t const f11, std::uint64_t const host_ns, std::uint32_t const ps_per_frame_) {
 	std::uint32_t const cnt = TIM5->CNT;
 	std::uint16_t const now11 = (OTG_FS_DEV->DSTS >> 8) & 0x7FF;
 	std::uint32_t const frames_since = (now11 - f11) & 0x7FF;  // how long ago the host's frame was
 	base_cnt = cnt - frames_since;
-	base_ns = unix_ns;
+	base_ns = host_ns;
+	ps_per_frame = ps_per_frame_;
 }
 
-// Receive 'S' frames: shift every byte into a 13-byte window, accept when markers and CRC match.
+// Receive 'S' frames: shift every byte into a 17-byte window, accept when markers and CRC match.
 static void poll_sync() {
 	static CRC8 crc8(0x07, 0, 0, false, false);
-	static std::uint8_t msg[13];
+	static std::uint8_t msg[17];
 	while (Serial.available()) {
 		std::memmove(msg, msg + 1, sizeof(msg) - 1);
 		msg[sizeof(msg) - 1] = static_cast<std::uint8_t>(Serial.read());
-		if (msg[0] != 'S' || msg[12] != 'S') continue;
+		if (msg[0] != 'S' || msg[16] != 'S') continue;
 
 		crc8.restart();
-		crc8.add(msg + 1, 10);
-		if (crc8.calc() != msg[11]) continue;
+		crc8.add(msg + 1, 14);
+		if (crc8.calc() != msg[15]) continue;
 
 		std::uint16_t f11;
-		std::uint64_t unix_ns;
+		std::uint64_t host_ns;
+		std::uint32_t ps;
 		std::memcpy(&f11, msg + 1, 2);
-		std::memcpy(&unix_ns, msg + 3, 8);
-		sof_sync(f11 & 0x7FF, unix_ns);
+		std::memcpy(&host_ns, msg + 3, 8);
+		std::memcpy(&ps, msg + 11, 4);
+		sof_sync(f11 & 0x7FF, host_ns, ps);
 		msg[0] = 0;
 	}
 }
 
-// 'T' | timestamp (uint64, unix ns) | CRC8 | 'T'
+// 'T' | timestamp (uint64, host ns) | CRC8 | 'T'
 static void send_time(std::uint64_t const unix_ns) {
 	static CRC8 crc8(0x07, 0, 0, false, false);
 
