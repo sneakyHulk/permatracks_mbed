@@ -4,3 +4,6 @@
 [submodule "lib/lsm6dsv16x-pid"]
 	path = lib/lsm6dsv16x-pid
 	url = https://github.com/STMicroelectronics/lsm6dsv16x-pid.git
+[submodule "lib/common"]
+	path = lib/common
+	url = https://github.com/sneakyHulk/common.git
