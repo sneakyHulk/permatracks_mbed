@@ -5,7 +5,7 @@
 #include <H7Adc.h>
 #include <HalSpi4.h>
 #include <MCP9700B.h>
-#include <MagneticFluxDensityDatapointRaw.h>
+#include <MagneticFluxDensityDataRawFLC100.h>
 #include <SPI.h>
 #include <TemperatureDatapointRaw.h>
 #include <common2_output.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <H7Adc.h>
-#include <TemperatureDatapointRaw.h>
+#include <TemperatureDataRaw.h>
 
 #include <cstdint>
 
@@ -25,18 +25,18 @@ class MCP9700B final {
 	MCP9700B(H7Adc& adc, std::uint32_t const channel) : adc_(adc), channel_(channel) { adc_.enable(channel_); }
 
 	// LSB per °C and offset in °C: T[°C] = datapoint / get_scale_factor() + get_offset().
-	static double get_scale_factor() { return H7Adc::full_scale * tc / H7Adc::vref; }
-	static double get_offset() { return -v0 / tc; }
+	static float get_scale_factor() { return H7Adc::full_scale * tc / H7Adc::vref; }
+	static float get_offset() { return -v0 / tc; }
 
 	// Raw 12-bit ADC code of the last adc.read(), packed for the serial frame.
-	[[nodiscard]] TemperatureDatapointRaw get_measurement() const { return TemperatureDatapointRaw{.datapoint = adc_.raw(channel_)}; }
+	[[nodiscard]] TemperatureDataRaw get_measurement() const { return TemperatureDatapointRaw{.datapoint = adc_.raw(channel_)}; }
 
 	// Temperature in degrees Celsius, for human-readable output.
-	[[nodiscard]] double get_celsius() const { return (adc_.volts(channel_) - v0) / tc; }
+	[[nodiscard]] float get_celsius() const { return (adc_.volts(channel_) - v0) / tc; }
 
    private:
-	static constexpr double v0 = 0.5;   // MCP9700B output at 0 °C [V]
-	static constexpr double tc = 0.01;  // MCP9700B slope [V/°C]
+	static constexpr float v0 = 0.5;   // MCP9700B output at 0 °C [V]
+	static constexpr float tc = 0.01;  // MCP9700B slope [V/°C]
 
 	H7Adc& adc_;
 	std::uint32_t const channel_;

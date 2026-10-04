@@ -1,6 +1,6 @@
 #pragma once
 
-#include <MagneticFluxDensityDatapointRaw.h>
+#include <MagneticFluxDensityDataRawFLC100.h>
 
 #include <cstdint>
 
@@ -26,7 +26,7 @@ class FLC100 final {
 	static double get_scale_factor() { return Adc::full_scale / (Adc::vref * tesla_per_volt); }
 
 	// Raw signed 24-bit ADC code of the last adc.read(), packed for the serial frame.
-	[[nodiscard]] MagneticFluxDensityDatapointRaw get_measurement() const { return MagneticFluxDensityDatapointRaw{.datapoint = adc_.raw(ch_)}; }
+	[[nodiscard]] MagneticFluxDensityDataRawFLC100 get_measurement() const { return MagneticFluxDensityDataRawFLC100{.data = adc_.raw(ch_)}; }
 
 	// Magnetic flux density in tesla (T), for human-readable output.
 	[[nodiscard]] double get_tesla() const { return adc_.volts(ch_) * tesla_per_volt; }
