@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <HalSpi4.h>
-#include <common2_output.h>
+#include <common_output.h>
 
 #include <cstdint>
 
@@ -65,19 +65,19 @@ class ADS131E08 final {
 		}
 
 		// hardware reset: nRESET low >= 2 tCLK (§9.4.2), then 18 tCLK before the first command
-		common2::print_time_loc(millis(), "'ADS131E08' do hardware reset...");
+		common::print_loc(millis(), " ms 'ADS131E08' do hardware reset... ");
 		digitalWrite(nreset_a_, LOW);
 		if constexpr (daisy_chain) digitalWrite(nreset_b_, LOW);
 		delay(1);
 		digitalWrite(nreset_a_, HIGH);
 		if constexpr (daisy_chain) digitalWrite(nreset_b_, HIGH);
 		delay(1);
-		common2::println("Done!");
+		common::println("Done!");
 
 		// the chip powers up / resets into RDATAC; registers are only reachable after SDATAC
-		common2::print_time_loc(millis(), "'ADS131E08' stop continuous read mode...");
+		common::print_loc(millis(), " ms 'ADS131E08' stop continuous read mode... ");
 		cmd(SDATAC);
-		common2::println("Done!");
+		common::println("Done!");
 
 		// check sensor
 		initialized = check_device_id();
@@ -87,7 +87,7 @@ class ADS131E08 final {
 		initialized = configure(config2_normal, chset_normal);
 		if (!initialized) return;
 
-		common2::println_time_loc(millis(), "'ADS131E08' Ready!");
+		common::println_loc(millis(), " ms 'ADS131E08' Ready!");
 	}
 
 	[[nodiscard]] bool is_initialized() const { return initialized; }
@@ -110,13 +110,13 @@ class ADS131E08 final {
 		bool ok = synced;
 		for (std::uint8_t ch = 0; ch < n_channels; ++ch) ok = ok && raw_[ch] > test_min && raw_[ch] < test_max;
 		for (std::uint8_t chip = 0; chip < n_chips; ++chip) ok = ok && status_ok(chip);
-		common2::print_time_loc(millis(), "'ADS131E08' self test with internal test signal...");
+		common::print_loc(millis(), " ms 'ADS131E08' self test with internal test signal... ");
 		if (!ok) {
-			common2::println("Abort!");
-			common2::println_time_loc(millis(), "'ADS131E08' expected", test_expected, "in (", test_min, ",", test_max, "), synced", synced);
+			common::println("Abort!");
+			common::println_loc(millis(), " ms 'ADS131E08' expected ", test_expected, " in (", test_min, ", ", test_max, "), synced ", synced);
 			print_frame();
 		} else {
-			common2::println("Done!");
+			common::println("Done!");
 		}
 
 		// back to the sensor inputs
@@ -127,19 +127,19 @@ class ADS131E08 final {
 	// RDATAC + START: frames stream on DOUT at every DRDY from here on. No register
 	// access until stop().
 	void start() {
-		common2::print_time_loc(millis(), "'ADS131E08' start conversions (RDATAC, START high)...");
+		common::print_loc(millis(), " ms 'ADS131E08' start conversions (RDATAC, START high)... ");
 		cmd(RDATAC);
 		digitalWrite(start_, HIGH);
 		delay(6);  // > tSETTLE (9224 tCLK = 4.5 ms at 1 kSPS)
-		common2::println("Done!");
+		common::println("Done!");
 	}
 
 	// START low halts conversions; SDATAC makes registers reachable again.
 	void stop() {
-		common2::print_time_loc(millis(), "'ADS131E08' stop conversions (START low, SDATAC)...");
+		common::print_loc(millis(), " ms 'ADS131E08' stop conversions (START low, SDATAC)... ");
 		digitalWrite(start_, LOW);
 		cmd(SDATAC);
-		common2::println("Done!");
+		common::println("Done!");
 	}
 
 	// Wait for the next DRDY falling edge, clock the whole chained frame out and
@@ -185,8 +185,8 @@ class ADS131E08 final {
 	[[nodiscard]] bool data_ready() const { return digitalRead(drdy_) == LOW; }
 
 	void print_frame() const {
-		common2::println_time(millis(), "A", status_[0], status_ok(0) ? "OK" : "BAD", raw_[0], raw_[1], raw_[2], raw_[3], raw_[4], raw_[5], raw_[6], raw_[7]);
-		if constexpr (daisy_chain) common2::println_time(millis(), "B", status_[1], status_ok(1) ? "OK" : "BAD", raw_[8], raw_[9], raw_[10], raw_[11], raw_[12], raw_[13], raw_[14], raw_[15]);
+		common::dprintln<" ">(millis(), "A", status_[0], status_ok(0) ? "OK" : "BAD", raw_[0], raw_[1], raw_[2], raw_[3], raw_[4], raw_[5], raw_[6], raw_[7]);
+		if constexpr (daisy_chain) common::dprintln<" ">(millis(), "B", status_[1], status_ok(1) ? "OK" : "BAD", raw_[8], raw_[9], raw_[10], raw_[11], raw_[12], raw_[13], raw_[14], raw_[15]);
 	}
 
 	// Single register read (chip A). Only valid in SDATAC (between begin()/stop() and start()).
@@ -282,7 +282,7 @@ class ADS131E08 final {
 	[[nodiscard]] bool verify(char const* const name, std::uint8_t const addr, std::uint8_t const expected, std::uint8_t const mask = 0xFF) {
 		std::uint8_t const got = rreg(addr);
 		if ((got & mask) == (expected & mask)) return true;
-		common2::print("Error!", name, ":", got, "/", expected, "!");
+		common::dprint<" ">("Error!", name, ":", got, "/", expected, "!");
 		return false;
 	}
 
@@ -304,37 +304,37 @@ class ADS131E08 final {
 
 	// Write all registers and read them back; retry like AK09940A::power_down().
 	[[nodiscard]] bool configure(std::uint8_t const config2, std::uint8_t const chset) {
-		common2::print_time_loc(millis(), "'ADS131E08' write and verify registers...");
+		common::print_loc(millis(), " ms 'ADS131E08' write and verify registers... ");
 
 		for (auto i = 0; i < retries; ++i) {
 			write_registers(config2, chset);
 
 			if (!verify_registers(config2, chset)) {
-				common2::print(" Retry...");
+				common::print(" Retry...");
 				delay(100);
 				continue;
 			}
 
-			common2::println("Done!");
+			common::println("Done!");
 			return true;
 		}
 
-		common2::println("Abort!");
+		common::println("Abort!");
 		return false;
 	}
 
 	[[nodiscard]] bool check_device_id() {
-		common2::print_time_loc(millis(), "'ADS131E08' check device id...");
+		common::print_loc(millis(), " ms 'ADS131E08' check device id... ");
 		for (auto i = 0; i < retries; ++i) {
 			std::uint8_t const id = rreg(ID);
 			if (id == expected_id) {
-				common2::println("Done!");
+				common::println("Done!");
 				return true;
 			}
-			common2::print("Error! ID:", id, "/", expected_id, "! Retry...");
+			common::dprint<" ">("Error! ID:", id, "/", expected_id, "! Retry...");
 			delay(100);
 		}
-		common2::println("Abort!");
+		common::println("Abort!");
 		return false;
 	}
 

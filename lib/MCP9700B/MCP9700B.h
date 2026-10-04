@@ -29,7 +29,7 @@ class MCP9700B final {
 	static float get_offset() { return -v0 / tc; }
 
 	// Raw 12-bit ADC code of the last adc.read(), packed for the serial frame.
-	[[nodiscard]] TemperatureDataRaw get_measurement() const { return TemperatureDatapointRaw{.datapoint = adc_.raw(channel_)}; }
+	[[nodiscard]] TemperatureDataRaw get_measurement() const { return TemperatureDataRaw{.datapoint = adc_.raw(channel_)}; }
 
 	// Temperature in degrees Celsius, for human-readable output.
 	[[nodiscard]] float get_celsius() const { return (adc_.volts(channel_) - v0) / tc; }

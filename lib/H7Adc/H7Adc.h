@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <common2_output.h>
+#include <common_output.h>
 
 #include <cstdint>
 
@@ -39,7 +39,7 @@ class H7Adc final {
 		// Make sure HSI is running — we clock the ADC from it (independent of the
 		// HSE/PLL sysclk tree, so it is always available). Does not disturb sysclk.
 		// Both are global/idempotent, so it is fine if several H7Adc call begin().
-		common2::print_time_loc(millis(), '\'', name(), '\'', "configure kernel clock...");
+		common::print_loc(millis(), " ms '", name(), "' configure kernel clock... ");
 		RCC_OscInitTypeDef osc = {};
 		osc.OscillatorType = RCC_OSCILLATORTYPE_HSI;
 		osc.HSIState = RCC_HSI_ON;
@@ -58,7 +58,7 @@ class H7Adc final {
 		} else {
 			__HAL_RCC_ADC12_CLK_ENABLE();
 		}
-		common2::println("Done!");
+		common::println("Done!");
 
 		h_.Instance = inst_;
 		h_.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;  // slow & safe (temperature doesn't need speed)
@@ -76,24 +76,24 @@ class H7Adc final {
 		h_.Init.OversamplingMode = DISABLE;
 
 		// init
-		common2::print_time_loc(millis(), '\'', name(), '\'', "init...");
+		common::print_loc(millis(), " ms '", name(), "' init... ");
 		initialized = HAL_ADC_Init(&h_) == HAL_OK;
 		if (!initialized) {
-			common2::println("Abort!");
+			common::println("Abort!");
 			return;
 		}
-		common2::println("Done!");
+		common::println("Done!");
 
 		// calibrate (offset, single-ended)
-		common2::print_time_loc(millis(), '\'', name(), '\'', "calibrate...");
+		common::print_loc(millis(), " ms '", name(), "' calibrate... ");
 		initialized = HAL_ADCEx_Calibration_Start(&h_, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) == HAL_OK;
 		if (!initialized) {
-			common2::println("Abort!");
+			common::println("Abort!");
 			return;
 		}
-		common2::println("Done!");
+		common::println("Done!");
 
-		common2::println_time_loc(millis(), '\'', name(), '\'', "Ready!");
+		common::println_loc(millis(), " ms '", name(), "' Ready!");
 	}
 
 	// One polled 12-bit conversion per enabled channel; results latched for raw()/volts().
