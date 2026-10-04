@@ -1,23 +1,69 @@
 #include <ADS131E08.h>
 #include <Arduino.h>
-#include <CRC16.h>
 #include <FLC100.h>
 #include <H7Adc.h>
 #include <HalSpi4.h>
 #include <MCP9700B.h>
 #include <MagneticFluxDensityDataRawFLC100.h>
 #include <SPI.h>
-#include <TemperatureDatapointRaw.h>
-#include <common2_output.h>
+#include <TemperatureDataRaw.h>
+#include <WireMessages.h>
+#include <common_parser.h>
+#include <ntp.h>
+#include <usb_sof.h>
 
+#include <algorithm>
 #include <array>
-#include <bit>
+#include <boost/crc.hpp>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <span>
+#include <tuple>
+#include <variant>
+
+using Crc = boost::crc_16_type;
+using TemperatureMessage = TemperatureDataRawWireMessage<16>;
+using MagMessage = MagneticFluxDensityRawWireMessage<16, MagneticFluxDensityDataRawFLC100>;
+
+// bytes from the host: ntp time sync responses and USB SOF syncs
+static common::Parser<Header, Crc, TimeSyncResponseWireMessage, SofSyncWireMessage> host_parser;
+
+// host time (micros() + offset of the ntp time sync in setup())
+static NtpClock ntp_clock;
+
+// host-locked ms from the USB SOF (TIM5) and the time since the last SOF (TIM8), see usb_sof.h
+static UsbSofClock sof_clock;
+
+// info frame [I][header][text: n][n][crc][I], the text is formatted by Arduino's Print::print, at most 255 characters.
+// InfoPrint is a Print: every formatted character arrives in write(), goes on to Serial and into the checksum and length
+template <common::Checksum C>
+static void send_info(auto const&... args) {
+	struct InfoPrint final : Print {
+		C crc;
+		std::uint8_t size = 0;
+
+		std::size_t write(std::uint8_t const byte) override {
+			Serial.write(byte);
+			crc.process_byte(byte);
+			++size;
+			return 1;
+		}
+	} info;
+	Header const header{ntp_clock.now()};
+
+	Serial.write('I');
+	for (auto const byte : std::as_bytes(std::span{&header, 1})) info.write(static_cast<std::uint8_t>(byte));
+	info.size = 0;  // the header is in the checksum, but not in the length
+
+	(info.print(args), ...);
+
+	Serial.write(info.size);
+	for (std::size_t k = 0; k < common::checksum_size<C>; ++k) Serial.write(static_cast<std::uint8_t>(info.crc.checksum() >> (8 * k)));
+	Serial.write('I');
+}
 
 static bool led_state = LOW;
-
-// Device-register view of the OTG_FS core (frame number lives in DSTS).
-#define OTG_FS_DEV ((USB_OTG_DeviceTypeDef*)((uint32_t)USB_OTG_FS + USB_OTG_DEVICE_BASE))
 
 // One ADC driver each. tmp_adc1: PA/PC/PB channels. tmp_adc3: the PC2_C/PC3_C pads.
 static H7Adc tmp_adc1(ADC1);
@@ -98,96 +144,8 @@ void usb_throughput_test(std::uint32_t const total_bytes = 262144) {  // default
 	float const sec = (t1 - t0) / 1e6f;
 	float const Bps = sent / sec;
 
-	char msg[160];
-	snprintf(msg, sizeof(msg),
-	    "\n--- USB throughput ---\n"
-	    "Link      : %s\n"
-	    "Sent      : %lu bytes in %.3f s\n"
-	    "Throughput: %.1f kB/s  (%.2f Mbit/s)\n",
-	    usb_link_speed(), static_cast<unsigned long>(sent), sec, Bps / 1000.0f, Bps * 8.0f / 1e6f);
-	Serial.print(msg);
+	send_info<Crc>("USB throughput: link ", usb_link_speed(), ", sent ", static_cast<unsigned long>(sent), " bytes in ", sec, " s, ", Bps / 1000.0f, " kB/s (", Bps * 8.0f / 1e6f, " Mbit/s)");
 	Serial.flush();
-}
-
-// -----------------------------------------------------------------------------
-// STEP 1: a self-running MILLISECOND counter driven by the USB SOF.
-//
-// TIM5 is put in EXTERNAL CLOCK MODE 1: its counter is clocked by the internal
-// trigger ITR8 (= USB2 OTG_FS SOF, per RM0433 Table 338) instead of the CPU
-// clock. So the SOF itself fills the timer — TIM5->CNT rises once per SOF with
-// no software help. On this core the SOF trigger is a steady DOUBLET — two
-// pulses ~1.8µs apart per SOF (measured; an OTG quirk of USB2/OTG_HS2-in-FS) —
-// so PSC = 1 (÷2) makes one count = one SOF = one ms. Result: TIM5->CNT is a
-// host-locked millisecond count you can read at ANY time, rolling over only
-// after 2^32 ms ≈ 49.7 days.
-//
-// SMCR fields (RM0433 "Bits 21,20,6,5,4 = TS[4:0]"; "Bits 16,2,1,0 = SMS[3:0]").
-// NOTE: the TIM2-5 TS map is non-linear (01000=ITR4 ... 01100=ITR8), so:
-//   TS  = 0b01100 = ITR8             -> TIM_SMCR_TS_3 | TIM_SMCR_TS_2   (8 + 4)
-//   SMS = 0b0111  = ext clock mode 1 -> TIM_SMCR_SMS_2 | SMS_1 | SMS_0
-// -----------------------------------------------------------------------------
-static void sof_timer_init() {
-	__HAL_RCC_TIM5_CLK_ENABLE();
-	TIM5->CR1 = 0;
-	TIM5->PSC = 1;           // ÷2: confirmed DOUBLET (2 pulses/SOF, ~1.8µs apart) → +1 count per SOF = 1 ms
-	TIM5->ARR = 0xFFFFFFFF;  // full 32-bit range
-	TIM5->CNT = 0;
-
-	TIM5->SMCR = TIM_SMCR_TS_3 | TIM_SMCR_TS_2                        // TS  = 0b01100 = ITR8 (USB2 OTG_FS SOF)
-	             | TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1 | TIM_SMCR_SMS_0;  // SMS = external clock mode 1
-
-	TIM5->EGR = TIM_EGR_UG;
-	TIM5->CR1 |= TIM_CR1_CEN;
-}
-
-// Milliseconds since start, straight from the SOF-driven timer. Autonomous:
-// correct whenever you read it, no matter how rarely you call it.
-static std::uint32_t sof_ms() { return TIM5->CNT; }
-
-// One-shot CHECK: does the SOF-timer advance 1:1 with the DSTS frame counter?
-// (DSTS is the raw 11-bit USB frame number = a clean 1 kHz reference.)
-static void sof_timer_check() {
-	std::uint16_t const f0 = (OTG_FS_DEV->DSTS >> 8) & 0x7FF;
-	std::uint32_t const c0 = TIM5->CNT;
-	delay(200);  // ~200 SOFs (SysTick delay — this is the CHECK, not the clock)
-	std::uint16_t const f1 = (OTG_FS_DEV->DSTS >> 8) & 0x7FF;
-	std::uint32_t const c1 = TIM5->CNT;
-
-	std::uint32_t const dframe = (f1 - f0) & 0x7FFu;  // DSTS frames elapsed
-	std::uint32_t const dcnt = c1 - c0;               // SOF-timer ms elapsed
-
-	char m[112];
-	snprintf(m, sizeof(m), "sof_timer check: %lu timer-ms vs %lu DSTS-frames in ~200ms (want equal)\n", static_cast<unsigned long>(dcnt), static_cast<unsigned long>(dframe));
-	Serial.print(m);
-}
-
-// DIAGNOSTIC: dump the gaps between consecutive ITR8/SOF trigger events, in
-// timer ticks. Reveals the real pattern (clean 1x, doublet, even 2x, or jitter).
-// 1 ms ~= 238205 ticks at the CPU clock.
-[[maybe_unused]] static void sof_interval_dump() {
-	__HAL_RCC_TIM5_CLK_ENABLE();
-	TIM5->CR1 = 0;
-	TIM5->PSC = 0;
-	TIM5->ARR = 0xFFFFFFFF;
-	TIM5->SMCR = TIM_SMCR_TS_3 | TIM_SMCR_TS_2;  // TS = ITR8, SMS = 0 (input capture, free-run counter)
-	TIM5->CCMR1 = (3u << TIM_CCMR1_CC1S_Pos);    // IC1 <- TRC (the trigger)
-	TIM5->CCER = TIM_CCER_CC1E;                  // enable capture
-	TIM5->EGR = TIM_EGR_UG;
-	TIM5->CR1 = TIM_CR1_CEN;
-
-	Serial.println("--- SOF trigger intervals (ticks between consecutive events; 1ms~=238205) ---");
-	std::uint32_t prev = TIM5->CCR1;
-	for (int i = 0; i < 40; ++i) {
-		std::uint32_t g = 0;
-		while (TIM5->CCR1 == prev && ++g < 50000000u) {
-		}  // wait for the next capture
-		std::uint32_t const cur = TIM5->CCR1;
-		char m[40];
-		snprintf(m, sizeof(m), "%lu\n", static_cast<unsigned long>(cur - prev));
-		Serial.print(m);
-		prev = cur;
-	}
-	Serial.println("--- done ---");
 }
 
 void setup() {
@@ -200,13 +158,26 @@ void setup() {
 		Serial.begin();
 		while (!Serial) {
 		}  // wait for enumeration → USB SOFs are now flowing
-		Serial.println("Hello over USB");
-		Serial.println("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
+		send_info<Crc>("Hello over USB");
+		send_info<Crc>("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
 	}
 
-	// sof_interval_dump();  // DIAGNOSTIC (confirmed a steady doublet → PSC=1)
-	sof_timer_init();   // SOF fills TIM5 (÷2 for the doublet) → CNT = ms
-	sof_timer_check();  // verify CNT advances 1:1 with the DSTS frame
+	{  // clocks: begin both, then sync both with the host (blocking until the host answers)
+		if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
+		if (auto const begun = ntp_clock.begin(); !begun) send_info<Crc>("NtpClock: ", begun.error().what(), " (", begun.error().code, ")");
+
+		if (auto const synced = ntp_clock.sync(host_parser); !synced) {
+			send_info<Crc>("NtpClock: ", synced.error().what());
+		} else {
+			send_info<Crc>("NtpClock synced, delay ", static_cast<unsigned long>(ntp_clock.delay / 1000), " us");
+		}
+
+		if (auto const synced = sof_clock.sync(host_parser); !synced) {
+			send_info<Crc>("UsbSofClock: ", synced.error().what());
+		} else {
+			send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+		}
+	}
 
 	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
 	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
@@ -215,7 +186,7 @@ void setup() {
 		std::uint32_t const t0 = micros();
 		tmp_adc1.read();
 		tmp_adc3.read();
-		common2::println_time_loc(millis(), "'ADC1+ADC3' all 16 channels:", micros() - t0, "us (budget: 1000 us per mag frame)");
+		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", micros() - t0, " us (budget: 1000 us per mag frame)");
 	}
 
 	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
@@ -224,162 +195,53 @@ void setup() {
 	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
 }
 
-// Binary output: one 'C' (temperature) and one 'M' (magnetic) CRC16 frame per mag sample, for the parser.
+// Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
+// Timestamps are host time in ns (ntp_clock).
 static void loop_frames() {
-	std::uint32_t const ms = sof_ms();  // SOF-driven, host-locked millisecond timestamp
-
-	{  // 'C' frame (Celsius; 'T' is the time sync marker): 'C' | scale (8 B) | offset (8 B) | 16 x TemperatureDatapointRaw (2 B) | timestamp (8 B, ns) | CRC16 (2 B) | 'C'
-		static CRC16 crc16(0x8005, 0, false, true, true);
-
+	{                     // [T][timestamp][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
 		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
 		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
 
-		auto const tmp01 = temp01.get_measurement();
-		auto const tmp02 = temp02.get_measurement();
-		auto const tmp03 = temp03.get_measurement();
-		auto const tmp04 = temp04.get_measurement();
-		auto const tmp05 = temp05.get_measurement();
-		auto const tmp06 = temp06.get_measurement();
-		auto const tmp07 = temp07.get_measurement();
-		auto const tmp08 = temp08.get_measurement();
-		auto const tmp09 = temp09.get_measurement();
-		auto const tmp10 = temp10.get_measurement();
-		auto const tmp11 = temp11.get_measurement();
-		auto const tmp12 = temp12.get_measurement();
-		auto const tmp13 = temp13.get_measurement();
-		auto const tmp14 = temp14.get_measurement();
-		auto const tmp15 = temp15.get_measurement();
-		auto const tmp16 = temp16.get_measurement();
+		TemperatureMessage message{};
+		message.timestamp = ntp_clock.now();
+		message.offset = MCP9700B::get_offset();
+		message.scale = MCP9700B::get_scale_factor();
+		message.data = {temp01.get_measurement(), temp02.get_measurement(), temp03.get_measurement(), temp04.get_measurement(), temp05.get_measurement(), temp06.get_measurement(), temp07.get_measurement(), temp08.get_measurement(),
+		    temp09.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement()};
 
-		Serial.write(static_cast<std::uint8_t>('C'));
-
-		auto const scale_mcp = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(MCP9700B::get_scale_factor());  // LSB per degC, double
-		Serial.write(scale_mcp.data(), scale_mcp.size());
-		crc16.add(scale_mcp.data(), scale_mcp.size());
-
-		auto const offset_mcp = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(MCP9700B::get_offset());  // degC, double
-		Serial.write(offset_mcp.data(), offset_mcp.size());
-		crc16.add(offset_mcp.data(), offset_mcp.size());
-
-		// clang-format off
-		Serial.write(tmp01.bytes.data(), tmp01.bytes.size()); crc16.add(tmp01.bytes.data(), tmp01.bytes.size());
-		Serial.write(tmp02.bytes.data(), tmp02.bytes.size()); crc16.add(tmp02.bytes.data(), tmp02.bytes.size());
-		Serial.write(tmp03.bytes.data(), tmp03.bytes.size()); crc16.add(tmp03.bytes.data(), tmp03.bytes.size());
-		Serial.write(tmp04.bytes.data(), tmp04.bytes.size()); crc16.add(tmp04.bytes.data(), tmp04.bytes.size());
-		Serial.write(tmp05.bytes.data(), tmp05.bytes.size()); crc16.add(tmp05.bytes.data(), tmp05.bytes.size());
-		Serial.write(tmp06.bytes.data(), tmp06.bytes.size()); crc16.add(tmp06.bytes.data(), tmp06.bytes.size());
-		Serial.write(tmp07.bytes.data(), tmp07.bytes.size()); crc16.add(tmp07.bytes.data(), tmp07.bytes.size());
-		Serial.write(tmp08.bytes.data(), tmp08.bytes.size()); crc16.add(tmp08.bytes.data(), tmp08.bytes.size());
-		Serial.write(tmp09.bytes.data(), tmp09.bytes.size()); crc16.add(tmp09.bytes.data(), tmp09.bytes.size());
-		Serial.write(tmp10.bytes.data(), tmp10.bytes.size()); crc16.add(tmp10.bytes.data(), tmp10.bytes.size());
-		Serial.write(tmp11.bytes.data(), tmp11.bytes.size()); crc16.add(tmp11.bytes.data(), tmp11.bytes.size());
-		Serial.write(tmp12.bytes.data(), tmp12.bytes.size()); crc16.add(tmp12.bytes.data(), tmp12.bytes.size());
-		Serial.write(tmp13.bytes.data(), tmp13.bytes.size()); crc16.add(tmp13.bytes.data(), tmp13.bytes.size());
-		Serial.write(tmp14.bytes.data(), tmp14.bytes.size()); crc16.add(tmp14.bytes.data(), tmp14.bytes.size());
-		Serial.write(tmp15.bytes.data(), tmp15.bytes.size()); crc16.add(tmp15.bytes.data(), tmp15.bytes.size());
-		Serial.write(tmp16.bytes.data(), tmp16.bytes.size()); crc16.add(tmp16.bytes.data(), tmp16.bytes.size());
-		// clang-format on
-
-		std::uint64_t const timestamp = 1'000'000ULL * ms;  // SOF ms -> ns
-		auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
-		Serial.write(timestamp_.data(), timestamp_.size());
-		crc16.add(timestamp_.data(), timestamp_.size());
-
-		auto const crc_value = std::bit_cast<std::array<std::uint8_t, 2>>(crc16.calc());
-		Serial.write(crc_value.data(), crc_value.size());
-
-		Serial.write(static_cast<std::uint8_t>('C'));
-
-		crc16.restart();
+		auto const frame = common::encode<Crc>(message);
+		Serial.write(frame.data(), frame.size());
 	}
 
-	{  // 'M' frame, same layout as mag-array-v2: 'M' | scale | 16 x MagneticFluxDensityDatapointRaw (3 B) | timestamp (8 B, ns) | CRC16 (2 B) | 'M'
-		static CRC16 crc16(0x8005, 0, false, true, true);
-
+	{                    // [M][timestamp][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
 		mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
 
-		auto const mag01 = flc01.get_measurement();
-		auto const mag02 = flc02.get_measurement();
-		auto const mag03 = flc03.get_measurement();
-		auto const mag04 = flc04.get_measurement();
-		auto const mag05 = flc05.get_measurement();
-		auto const mag06 = flc06.get_measurement();
-		auto const mag07 = flc07.get_measurement();
-		auto const mag08 = flc08.get_measurement();
-		auto const mag09 = flc09.get_measurement();
-		auto const mag10 = flc10.get_measurement();
-		auto const mag11 = flc11.get_measurement();
-		auto const mag12 = flc12.get_measurement();
-		auto const mag13 = flc13.get_measurement();
-		auto const mag14 = flc14.get_measurement();
-		auto const mag15 = flc15.get_measurement();
-		auto const mag16 = flc16.get_measurement();
+		MagMessage message{};
+		message.timestamp = ntp_clock.now();
+		message.scale = static_cast<std::int32_t>(std::lround(FLC100<ADS131E08<true>>::get_scale_factor() * 1e-6));  // LSB per uT (LSB per tesla does not fit into int32)
+		message.data = {flc01.get_measurement(), flc02.get_measurement(), flc03.get_measurement(), flc04.get_measurement(), flc05.get_measurement(), flc06.get_measurement(), flc07.get_measurement(), flc08.get_measurement(),
+		    flc09.get_measurement(), flc10.get_measurement(), flc11.get_measurement(), flc12.get_measurement(), flc13.get_measurement(), flc14.get_measurement(), flc15.get_measurement(), flc16.get_measurement()};
 
-		Serial.write(static_cast<std::uint8_t>('M'));
-
-		auto const scale_flc = std::bit_cast<std::array<std::uint8_t, sizeof(double)>>(FLC100<ADS131E08<true>>::get_scale_factor());  // LSB per tesla, double
-		Serial.write(scale_flc.data(), scale_flc.size());
-		crc16.add(scale_flc.data(), scale_flc.size());
-
-		// clang-format off
-		Serial.write(mag01.bytes.data(), mag01.bytes.size()); crc16.add(mag01.bytes.data(), mag01.bytes.size());
-		Serial.write(mag02.bytes.data(), mag02.bytes.size()); crc16.add(mag02.bytes.data(), mag02.bytes.size());
-		Serial.write(mag03.bytes.data(), mag03.bytes.size()); crc16.add(mag03.bytes.data(), mag03.bytes.size());
-		Serial.write(mag04.bytes.data(), mag04.bytes.size()); crc16.add(mag04.bytes.data(), mag04.bytes.size());
-		Serial.write(mag05.bytes.data(), mag05.bytes.size()); crc16.add(mag05.bytes.data(), mag05.bytes.size());
-		Serial.write(mag06.bytes.data(), mag06.bytes.size()); crc16.add(mag06.bytes.data(), mag06.bytes.size());
-		Serial.write(mag07.bytes.data(), mag07.bytes.size()); crc16.add(mag07.bytes.data(), mag07.bytes.size());
-		Serial.write(mag08.bytes.data(), mag08.bytes.size()); crc16.add(mag08.bytes.data(), mag08.bytes.size());
-		Serial.write(mag09.bytes.data(), mag09.bytes.size()); crc16.add(mag09.bytes.data(), mag09.bytes.size());
-		Serial.write(mag10.bytes.data(), mag10.bytes.size()); crc16.add(mag10.bytes.data(), mag10.bytes.size());
-		Serial.write(mag11.bytes.data(), mag11.bytes.size()); crc16.add(mag11.bytes.data(), mag11.bytes.size());
-		Serial.write(mag12.bytes.data(), mag12.bytes.size()); crc16.add(mag12.bytes.data(), mag12.bytes.size());
-		Serial.write(mag13.bytes.data(), mag13.bytes.size()); crc16.add(mag13.bytes.data(), mag13.bytes.size());
-		Serial.write(mag14.bytes.data(), mag14.bytes.size()); crc16.add(mag14.bytes.data(), mag14.bytes.size());
-		Serial.write(mag15.bytes.data(), mag15.bytes.size()); crc16.add(mag15.bytes.data(), mag15.bytes.size());
-		Serial.write(mag16.bytes.data(), mag16.bytes.size()); crc16.add(mag16.bytes.data(), mag16.bytes.size());
-		// clang-format on
-
-		std::uint64_t const timestamp = 1'000'000ULL * ms;  // SOF ms -> ns, same 8-byte field as v2
-		auto const timestamp_ = std::bit_cast<std::array<std::uint8_t, sizeof(timestamp)>>(timestamp);
-		Serial.write(timestamp_.data(), timestamp_.size());
-		crc16.add(timestamp_.data(), timestamp_.size());
-
-		auto const crc_value = std::bit_cast<std::array<std::uint8_t, 2>>(crc16.calc());
-		Serial.write(crc_value.data(), crc_value.size());
-
-		Serial.write(static_cast<std::uint8_t>('M'));
-
-		crc16.restart();
+		auto const frame = common::encode<Crc>(message);
+		Serial.write(frame.data(), frame.size());
 	}
 }
 
-// Human-readable output: temperature in degC and magnetic flux density in uT, one line each, once per second.
+// Human-readable output: temperature in degC and magnetic flux density in uT, one info frame each (time = frame header), once per second.
 static void loop_print() {
-	std::uint32_t const ms = sof_ms();
-
 	tmp_adc1.read();
 	tmp_adc3.read();
 	mag_adc.read();
 
-	char line[320];
-	snprintf(line, sizeof(line),
-	    "t=%lu.%03lu T01=%.1f T02=%.1f T03=%.1f T04=%.1f T05=%.1f T06=%.1f T07=%.1f T08=%.1f "
-	    "T09=%.1f T10=%.1f T11=%.1f T12=%.1f T13=%.1f T14=%.1f T15=%.1f T16=%.1f degC\n",
-	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), temp01.get_celsius(), temp02.get_celsius(), temp03.get_celsius(), temp04.get_celsius(), temp05.get_celsius(), temp06.get_celsius(), temp07.get_celsius(),
-	    temp08.get_celsius(), temp09.get_celsius(), temp10.get_celsius(), temp11.get_celsius(), temp12.get_celsius(), temp13.get_celsius(), temp14.get_celsius(), temp15.get_celsius(), temp16.get_celsius());
-	Serial.print(line);
+	send_info<Crc>("T01=", temp01.get_celsius(), " T02=", temp02.get_celsius(), " T03=", temp03.get_celsius(), " T04=", temp04.get_celsius(), " T05=", temp05.get_celsius(), " T06=", temp06.get_celsius(), " T07=", temp07.get_celsius(),
+	    " T08=", temp08.get_celsius(), " T09=", temp09.get_celsius(), " T10=", temp10.get_celsius(), " T11=", temp11.get_celsius(), " T12=", temp12.get_celsius(), " T13=", temp13.get_celsius(), " T14=", temp14.get_celsius(),
+	    " T15=", temp15.get_celsius(), " T16=", temp16.get_celsius(), " degC");
 
-	char mag_line[420];
-	snprintf(mag_line, sizeof(mag_line),
-	    "t=%lu.%03lu B01=%.3f B02=%.3f B03=%.3f B04=%.3f B05=%.3f B06=%.3f B07=%.3f B08=%.3f "
-	    "B09=%.3f B10=%.3f B11=%.3f B12=%.3f B13=%.3f B14=%.3f B15=%.3f B16=%.3f uT\n",
-	    static_cast<unsigned long>(ms / 1000), static_cast<unsigned long>(ms % 1000), flc01.get_tesla() * 1e6, flc02.get_tesla() * 1e6, flc03.get_tesla() * 1e6, flc04.get_tesla() * 1e6, flc05.get_tesla() * 1e6, flc06.get_tesla() * 1e6,
-	    flc07.get_tesla() * 1e6, flc08.get_tesla() * 1e6, flc09.get_tesla() * 1e6, flc10.get_tesla() * 1e6, flc11.get_tesla() * 1e6, flc12.get_tesla() * 1e6, flc13.get_tesla() * 1e6, flc14.get_tesla() * 1e6, flc15.get_tesla() * 1e6,
-	    flc16.get_tesla() * 1e6);
-	Serial.print(mag_line);
+	send_info<Crc>("B01=", flc01.get_tesla() * 1e6, " B02=", flc02.get_tesla() * 1e6, " B03=", flc03.get_tesla() * 1e6, " B04=", flc04.get_tesla() * 1e6, " B05=", flc05.get_tesla() * 1e6, " B06=", flc06.get_tesla() * 1e6,
+	    " B07=", flc07.get_tesla() * 1e6, " B08=", flc08.get_tesla() * 1e6, " B09=", flc09.get_tesla() * 1e6, " B10=", flc10.get_tesla() * 1e6, " B11=", flc11.get_tesla() * 1e6, " B12=", flc12.get_tesla() * 1e6,
+	    " B13=", flc13.get_tesla() * 1e6, " B14=", flc14.get_tesla() * 1e6, " B15=", flc15.get_tesla() * 1e6, " B16=", flc16.get_tesla() * 1e6, " uT");
 
 	delay(1000);
 }
 
-void loop() { loop_print(); }
+void loop() { loop_frames(); }
