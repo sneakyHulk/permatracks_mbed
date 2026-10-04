@@ -163,19 +163,21 @@ void setup() {
 	}
 
 	{  // clocks: begin both, then sync both with the host (blocking until the host answers)
+		// first SOF, then ntp: the host sends its SOF sync once at the start and answers the ntp requests afterwards
+		// (host side: data_collection test_permatracks_data_collection_common_parser)
 		if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
 		if (auto const begun = ntp_clock.begin(); !begun) send_info<Crc>("NtpClock: ", begun.error().what(), " (", begun.error().code, ")");
-
-		if (auto const synced = ntp_clock.sync(host_parser); !synced) {
-			send_info<Crc>("NtpClock: ", synced.error().what());
-		} else {
-			send_info<Crc>("NtpClock synced, delay ", static_cast<unsigned long>(ntp_clock.delay / 1000), " us");
-		}
 
 		if (auto const synced = sof_clock.sync(host_parser); !synced) {
 			send_info<Crc>("UsbSofClock: ", synced.error().what());
 		} else {
 			send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+		}
+
+		if (auto const synced = ntp_clock.sync(host_parser); !synced) {
+			send_info<Crc>("NtpClock: ", synced.error().what());
+		} else {
+			send_info<Crc>("NtpClock synced, delay ", static_cast<unsigned long>(ntp_clock.delay / 1000), " us");
 		}
 	}
 
@@ -244,4 +246,17 @@ static void loop_print() {
 	delay(1000);
 }
 
-void loop() { loop_frames(); }
+// both clocks read right after each other, the host compares them with its arrival time
+static void send_time_compare() {
+	TimeCompareWireMessage message{};
+	message.ntp_ns = ntp_clock.now();
+	message.sof_ns = sof_clock.now();
+
+	auto const frame = common::encode<Crc>(message);
+	Serial.write(frame.data(), frame.size());
+}
+
+void loop() {
+	loop_frames();
+	send_time_compare();
+}
