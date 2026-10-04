@@ -50,7 +50,7 @@ static void send_info(auto const&... args) {
 			return 1;
 		}
 	} info;
-	Header const header{ntp_clock.now()};
+	Header const header{1000ULL * micros()};  // send time, device clock
 
 	Serial.write('I');
 	for (auto const byte : std::as_bytes(std::span{&header, 1})) info.write(static_cast<std::uint8_t>(byte));
@@ -198,32 +198,34 @@ void setup() {
 }
 
 // Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
-// Timestamps are host time in ns (ntp_clock).
+// measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: device time (micros() * 1000) when sent.
 static void loop_frames() {
-	{                     // [T][timestamp][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
+	{                     // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
 		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
 		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
 
 		TemperatureMessage message{};
-		message.timestamp = ntp_clock.now();
+		message.measurement_timestamp = sof_clock.now();
 		message.offset = MCP9700B::get_offset();
 		message.scale = MCP9700B::get_scale_factor();
 		message.data = {temp01.get_measurement(), temp02.get_measurement(), temp03.get_measurement(), temp04.get_measurement(), temp05.get_measurement(), temp06.get_measurement(), temp07.get_measurement(), temp08.get_measurement(),
 		    temp09.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement()};
 
+		message.timestamp = 1000ULL * micros();  // send time, device clock
 		auto const frame = common::encode<Crc>(message);
 		Serial.write(frame.data(), frame.size());
 	}
 
-	{                    // [M][timestamp][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
+	{                    // [M][send time][measurement time][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
 		mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
 
 		MagMessage message{};
-		message.timestamp = ntp_clock.now();
+		message.measurement_timestamp = sof_clock.now();
 		message.scale = static_cast<std::int32_t>(std::lround(FLC100<ADS131E08<true>>::get_scale_factor() * 1e-6));  // LSB per uT (LSB per tesla does not fit into int32)
 		message.data = {flc01.get_measurement(), flc02.get_measurement(), flc03.get_measurement(), flc04.get_measurement(), flc05.get_measurement(), flc06.get_measurement(), flc07.get_measurement(), flc08.get_measurement(),
 		    flc09.get_measurement(), flc10.get_measurement(), flc11.get_measurement(), flc12.get_measurement(), flc13.get_measurement(), flc14.get_measurement(), flc15.get_measurement(), flc16.get_measurement()};
 
+		message.timestamp = 1000ULL * micros();  // send time, device clock
 		auto const frame = common::encode<Crc>(message);
 		Serial.write(frame.data(), frame.size());
 	}
@@ -252,6 +254,7 @@ static void send_time_compare() {
 	message.ntp_ns = ntp_clock.now();
 	message.sof_ns = sof_clock.now();
 
+	message.timestamp = 1000ULL * micros();  // send time, device clock
 	auto const frame = common::encode<Crc>(message);
 	Serial.write(frame.data(), frame.size());
 }

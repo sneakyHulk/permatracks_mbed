@@ -88,7 +88,7 @@ struct UsbSofClock {
 	}
 
 	// waits for a SofSyncWireMessage from the host (other messages are dropped) and syncs with it:
-	// host frame message.frame (11 bit) started at host time message.timestamp, one frame lasts message.ps_per_frame in host time
+	// host frame message.frame (11 bit) started at host time message.frame_ns, one frame lasts message.ps_per_frame in host time
 	// without timeout_us it blocks until the message arrives, with it the error says that none arrived in time
 	template <typename Header, common::Checksum Crc, typename... Ms>
 	std::expected<void, common::Error> sync(common::Parser<Header, Crc, Ms...>& parser, std::uint32_t const timeout_us = 0) {
@@ -100,7 +100,7 @@ struct UsbSofClock {
 		std::uint16_t const now11 = usb_frame();
 		std::uint32_t const frames_since = (now11 - (message.frame & 0x7FF)) & 0x7FF;  // how long ago the host's frame was
 		base_cnt = cnt - frames_since;
-		base_ns = message.timestamp;
+		base_ns = message.frame_ns;
 		ps_per_frame = message.ps_per_frame;
 		return {};
 	}
