@@ -11,6 +11,8 @@
 #include <common_parser.h>
 #include <ntp.h>
 #include <usb_sof.h>
+#include <usb_sof_ms.h>
+#include <wait_for.h>
 
 #include <algorithm>
 #include <array>
@@ -26,14 +28,17 @@ using Crc = boost::crc_16_type;
 using TemperatureMessage = TemperatureDataRawWireMessage<16>;
 using MagMessage = MagneticFluxDensityRawWireMessage<16, MagneticFluxDensityDataRawFLC100>;
 
-// bytes from the host: ntp time sync responses and USB SOF syncs
-static common::Parser<Header, Crc, TimeSyncResponseWireMessage, SofSyncWireMessage> host_parser;
+// bytes from the host: ntp time sync responses, USB SOF syncs and pings
+static common::Parser<Header, Crc, TimeSyncResponseWireMessage, SofSyncWireMessage, PingRequestWireMessage> host_parser;
 
 // host time (micros() + offset of the ntp time sync in setup())
 static NtpClock ntp_clock;
 
 // host-locked ms from the USB SOF (TIM5) and the time since the last SOF (TIM8), see usb_sof.h
 static UsbSofClock sof_clock;
+
+// host-locked ms from the USB SOF only (TIM5, start of the current ms), see usb_sof_ms.h; compared against sof_clock in send_time_compare()
+static UsbSofMsClock sof_ms_clock;
 
 // info frame [I][header][text: n][n][crc][I], the text is formatted by Arduino's Print::print, at most 255 characters.
 // InfoPrint is a Print: every formatted character arrives in write(), goes on to Serial and into the checksum and length
@@ -162,16 +167,21 @@ void setup() {
 		send_info<Crc>("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
 	}
 
-	{  // clocks: begin both, then sync both with the host (blocking until the host answers)
+	{  // clocks: begin all, then sync all with the host (blocking until the host answers)
 		// first SOF, then ntp: the host sends its SOF sync once at the start and answers the ntp requests afterwards
 		// (host side: data_collection test_permatracks_data_collection_common_parser)
+		// both SOF clocks share TIM5 and begin() resets it: ms clock first (counting only), then sof_clock (adds capture / TRGO for TIM8)
+		if (auto const begun = sof_ms_clock.begin(); !begun) send_info<Crc>("UsbSofMsClock: ", begun.error().what(), " (", begun.error().code, ")");
 		if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
 		if (auto const begun = ntp_clock.begin(); !begun) send_info<Crc>("NtpClock: ", begun.error().what(), " (", begun.error().code, ")");
 
-		if (auto const synced = sof_clock.sync(host_parser); !synced) {
-			send_info<Crc>("UsbSofClock: ", synced.error().what());
+		// the host sends one SOF sync, both SOF clocks take it
+		if (auto const message = wait_for<SofSyncWireMessage>(host_parser); !message) {
+			send_info<Crc>("UsbSofClock: no USB SOF sync from the host");
 		} else {
-			send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+			sof_clock.sync(*message);
+			sof_ms_clock.sync(*message);
+			send_info<Crc>("UsbSofClock + UsbSofMsClock synced, ", sof_clock.ps_per_frame, " ps per frame");
 		}
 
 		if (auto const synced = ntp_clock.sync(host_parser); !synced) {
@@ -248,17 +258,48 @@ static void loop_print() {
 	delay(1000);
 }
 
-// both clocks read right after each other, the host compares them with its arrival time
+// all clocks read right after each other, the host compares them with its arrival time and with each other
 static void send_time_compare() {
 	TimeCompareWireMessage message{};
 	message.ntp_ns = ntp_clock.now();
 	message.sof_ns = sof_clock.now();
+	message.sof_ms_ns = sof_ms_clock.now();
 
 	message.timestamp = 1000ULL * micros();  // send time, device clock
 	auto const frame = common::encode<Crc>(message);
 	Serial.write(frame.data(), frame.size());
 }
 
+// reads what the host sent: a ping is answered right away with both SOF clocks read now, other messages are dropped
+static void poll_host() {
+	while (Serial.available() > 0) {
+		std::uint8_t const data = static_cast<std::uint8_t>(Serial.read());
+		for (auto result = host_parser.parse(std::span{&data, 1}); result; result = host_parser.parse()) {
+			auto const* const ping = std::get_if<PingRequestWireMessage>(&*result);
+			if (!ping) continue;
+
+			PingResponseWireMessage response{};
+			response.sof_ns = sof_clock.now();
+			response.sof_ms_ns = sof_ms_clock.now();
+			response.t0 = ping->timestamp;
+			response.timestamp = 1000ULL * micros();  // send time, device clock
+			auto const frame = common::encode<Crc>(response);
+			Serial.write(frame.data(), frame.size());
+		}
+	}
+}
+
+// every 10 s (host time): how often TIM5 missed or double counted a SOF against the USB frame number (missed SOFs)
+static void report_sof_health() {
+	static std::uint64_t next_ns = sof_clock.now() + 10'000'000'000ULL;
+	if (sof_clock.now() < next_ns) return;
+	next_ns += 10'000'000'000ULL;
+	send_info<Crc>("UsbSofClock: TIM5 vs USB frame number since the sync: ", sof_clock.frames.corrected, " counts corrected, now ", sof_clock.frames.off, " off");
+}
+
 void loop() {
-	loop_print();
+	loop_frames();
+	send_time_compare();
+	poll_host();
+	report_sof_health();
 }

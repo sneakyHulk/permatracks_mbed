@@ -4,6 +4,7 @@
 #include <WireMessages.h>
 #include <common_error.h>
 #include <common_parser.h>
+#include <usb_sof_frames.h>
 #include <wait_for.h>
 
 #include <algorithm>
@@ -15,13 +16,13 @@
 
 // Host time from the USB start of frames (STM32H7, USB2 OTG_FS), synced with SofSyncWireMessage from the host.
 //
-// ms     : TIM5 counts SOFs in hardware (+1 per ms, locked to the host clock).
+// ms     : exact USB frames since the synced frame, TIM5 (counts SOFs in hardware) snapped to the USB frame number (DSTS), see usb_sof_frames.h.
 // sub-ms : TIM5 passes every SOF on (TRGO) to TIM8, which is reset by it -> TIM8->CNT = ticks since the last SOF.
 // After a sync now() = host time of that frame + (frames since that frame + time since the last SOF) * frame length,
 // without a sync it counts from 0 (= ns since begin()).
 struct UsbSofClock {
-	std::uint64_t base_ns = 0;                   // host ns at the start of TIM5 count base_cnt
-	std::uint32_t base_cnt = 0;                  // TIM5 count of the synced frame
+	std::uint64_t base_ns = 0;                   // host ns at the start of the anchor frame of `frames`
+	UsbSofFrames frames;                         // exact frames since the synced frame (TIM5 + DSTS)
 	std::uint32_t ps_per_frame = 1'000'000'000;  // length of one USB frame in host time (ps), nominal 1 ms until synced
 	std::uint32_t ticks_per_sof = 30'000;        // TIM8 ticks per USB frame (SOF to SOF), measured in begin()
 
@@ -36,7 +37,7 @@ struct UsbSofClock {
 	//   SMS = 0b0111  = ext clock mode 1 -> TIM_SMCR_SMS_2 | SMS_1 | SMS_0
 	// Fails without SOFs or when TIM5 does not count 1 per USB frame over 20 frames (~20 ms), e.g. the trigger is not a doublet and PSC = 1 is wrong.
 	[[nodiscard]] std::expected<void, common::Error> begin() {
-		constexpr std::uint32_t frames = 20;
+		constexpr std::uint32_t check_frames = 20;
 
 		__HAL_RCC_TIM5_CLK_ENABLE();
 		TIM5->CR1 = 0;
@@ -66,48 +67,57 @@ struct UsbSofClock {
 		std::uint32_t max_cnt = 0;
 		std::uint16_t const f0 = usb_frame();
 		std::uint32_t const c0 = TIM5->CNT;
-		for (std::uint32_t const start = millis(); ((usb_frame() - f0) & 0x7FFu) < frames;) {
+		for (std::uint32_t const start = millis(); ((usb_frame() - f0) & 0x7FFu) < check_frames;) {
 			max_cnt = std::max(max_cnt, static_cast<std::uint32_t>(TIM8->CNT));
-			if (millis() - start > frames + 100) return std::unexpected(common::Error{"no USB SOF"});
+			if (millis() - start > check_frames + 100) return std::unexpected(common::Error{"no USB SOF"});
 		}
-		if (std::uint32_t const timer_ms = TIM5->CNT - c0; timer_ms + 1 < frames || timer_ms > frames + 1) {
+		if (std::uint32_t const timer_ms = TIM5->CNT - c0; timer_ms + 1 < check_frames || timer_ms > check_frames + 1) {
 			return std::unexpected(common::Error{timer_ms, "TIM5 does not count 1 per USB frame, code = counts in 20 frames"});
 		}
 
 		ticks_per_sof = max_cnt;
+		frames.anchor(usb_frame());  // without a sync: count from now
 		return {};
 	}
 
 	// host time in ns
 	[[nodiscard]] std::uint64_t now() const {
-		std::uint32_t const ms = TIM5->CNT;
-		std::uint32_t const ticks = TIM8->CNT;
-		std::uint64_t const frames_ps = static_cast<std::uint64_t>(ms - base_cnt) * ps_per_frame;
+		// frame number (DSTS) and TIM8 ticks must belong to the same frame:
+		//  - a SOF between the reads changes DSTS -> read again
+		//  - DSTS and the TIM8 reset come from the same SOF, but a few µs apart (TIM8 is even reset twice, by the SOF doublet):
+		//    right at a SOF the pair can belong to different frames (1 ms off) -> don't read within ~5 µs of a SOF, read again
+		//    (waits at most ~10 µs, ~1 % of the calls; after a missed SOF until TIM8 wraps, < 2.2 ms)
+		std::uint32_t const guard = ticks_per_sof / 200;  // ~5 µs
+		std::uint32_t frames_since = 0, ticks = 0;
+		for (;;) {
+			std::uint16_t const f11 = usb_frame();
+			ticks = TIM8->CNT;
+			if (ticks < guard || ticks + guard > ticks_per_sof) continue;  // near a SOF
+			frames_since = frames.since_anchor();
+			if (usb_frame() == f11) break;
+		}
+		std::uint64_t const frames_ps = static_cast<std::uint64_t>(frames_since) * ps_per_frame;
 		std::uint64_t const sub_ps = static_cast<std::uint64_t>(ticks) * ps_per_frame / ticks_per_sof;
 		return base_ns + (frames_ps + sub_ps) / 1000;
 	}
 
-	// waits for a SofSyncWireMessage from the host (other messages are dropped) and syncs with it:
-	// host frame message.frame (11 bit) started at host time message.frame_ns, one frame lasts message.ps_per_frame in host time
+	// waits for a SofSyncWireMessage from the host (other messages are dropped) and syncs with it
 	// without timeout_us it blocks until the message arrives, with it the error says that none arrived in time
 	template <typename Header, common::Checksum Crc, typename... Ms>
 	std::expected<void, common::Error> sync(common::Parser<Header, Crc, Ms...>& parser, std::uint32_t const timeout_us = 0) {
 		auto const received = wait_for<SofSyncWireMessage>(parser, timeout_us);
 		if (!received) return std::unexpected(common::Error{"no USB SOF sync from the host"});
-		auto const& message = *received;
-
-		std::uint32_t const cnt = TIM5->CNT;
-		std::uint16_t const now11 = usb_frame();
-		std::uint32_t const frames_since = (now11 - (message.frame & 0x7FF)) & 0x7FF;  // how long ago the host's frame was
-		base_cnt = cnt - frames_since;
-		base_ns = message.frame_ns;
-		ps_per_frame = message.ps_per_frame;
+		sync(*received);
 		return {};
 	}
 
-	// 11-bit USB frame number of the last SOF (OTG_FS device status register DSTS)
-	[[nodiscard]] static std::uint16_t usb_frame() {
-		auto const* const device = reinterpret_cast<USB_OTG_DeviceTypeDef const*>(reinterpret_cast<std::uint32_t>(USB_OTG_FS) + USB_OTG_DEVICE_BASE);
-		return (device->DSTS >> 8) & 0x7FF;
+	// host frame message.frame (11 bit) started at host time message.frame_ns, one frame lasts message.ps_per_frame in host time
+	void sync(SofSyncWireMessage const& message) {
+		frames.anchor(message.frame);  // blocks up to ~1 ms, see UsbSofFrames::same_frame()
+		base_ns = message.frame_ns;
+		ps_per_frame = message.ps_per_frame;
 	}
+
+	// 11-bit USB frame number of the last SOF (OTG_FS device status register DSTS)
+	[[nodiscard]] static std::uint16_t usb_frame() { return UsbSofFrames::usb_frame(); }
 };
