@@ -12,7 +12,8 @@ HardwareSerial Serial1(PB7, PB6);
 #include <SPI.h>
 #include <common2_message.h>
 #include <common2_output.h>
-#include <common2_time.h>
+#include <ntp.h>
+#include <boost/crc.hpp>
 
 #include <bit>
 #include <cstring>
@@ -67,6 +68,7 @@ MMC5983MA mmc5983ma25("MMC5983MA 25", PB9, &SPIrow3);
 
 std::uint64_t time_delay = 0;
 std::uint64_t time_offset = 0;
+common::Parser<Header, boost::crc_16_type, TimeSyncResponseWireMessage> host_parser;  // bytes from the host, here only the time sync response
 std::uint64_t timestamp = 0;
 
 bool led_state = LOW;
@@ -211,7 +213,7 @@ void setup() {
 
 	digitalWrite(PC13, led_state = LOW);
 
-	std::tie(time_delay, time_offset) = common2::sync_time();
+	if (NtpClock ntp_clock; ntp_clock.sync(host_parser, 1'000'000)) std::tie(time_delay, time_offset) = std::tuple{ntp_clock.delay, ntp_clock.offset};
 
 	delay(1);
 }
@@ -258,7 +260,7 @@ void loop() {
 	mmc5983ma25.start_measurement();
 
 	// timestamp computation is here because the LIS3MDLs already have the measurements, whereas for the MMC5983MA they have to be obtained.
-	// std::tie(time_delay, time_offset) = common::sync_time();
+	// std::tie(time_delay, time_offset) = ntp::sync_time();
 	if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
 		common2::message("micros overflow detected!");
 		return;

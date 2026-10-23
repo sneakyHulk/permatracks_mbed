@@ -24,9 +24,10 @@ inline void print_low_level(GyroDataRaw const& d) {
 }
 #include <LSM6DSV16X.h>
 #include <common2.h>
-#include <common2_time.h>
+#include <ntp.h>
 
 #include <bit>
+#include <boost/crc.hpp>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -163,6 +164,7 @@ decltype(micros()) t0;
 
 std::uint64_t time_delay = 0;
 std::uint64_t time_offset = 0;
+common::Parser<Header, boost::crc_16_type, TimeSyncResponseWireMessage> parser;  // parses bytes from the host, here only the time sync response
 std::uint64_t timestamp = 0;
 
 void setup() {
@@ -325,7 +327,7 @@ void setup() {
 
 	{
 		// sync time
-		std::tie(time_delay, time_offset) = common2::sync_time();
+		if (NtpClock ntp_clock; ntp_clock.sync(parser, 1'000'000)) std::tie(time_delay, time_offset) = std::tuple{ntp_clock.delay, ntp_clock.offset};
 	}
 
 	{  // trigger sensors
@@ -538,7 +540,7 @@ void loop() {
 	}
 
 	{  // check overflow
-		// std::tie(time_delay, time_offset) = common::sync_time();
+		// std::tie(time_delay, time_offset) = ntp::sync_time();
 		if (std::exchange(timestamp, 1000ULL * micros() + time_offset) >= timestamp) {  // when time overflow is detected:
 			common2::message("micros overflow detected!");
 			delayMicroseconds(3500);

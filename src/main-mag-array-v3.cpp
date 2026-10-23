@@ -237,11 +237,11 @@ static void loop_print() {
 	tmp_adc3.read();
 	mag_adc.read();
 
-	send_info<Crc>("T01=", temp01.get_celsius(), " T02=", temp02.get_celsius(), " T03=", temp03.get_celsius(), " T04=", temp04.get_celsius(), " T05=", temp05.get_celsius(), " T06=", temp06.get_celsius(), " T07=", temp07.get_celsius(),
+	common::println("T01=", temp01.get_celsius(), " T02=", temp02.get_celsius(), " T03=", temp03.get_celsius(), " T04=", temp04.get_celsius(), " T05=", temp05.get_celsius(), " T06=", temp06.get_celsius(), " T07=", temp07.get_celsius(),
 	    " T08=", temp08.get_celsius(), " T09=", temp09.get_celsius(), " T10=", temp10.get_celsius(), " T11=", temp11.get_celsius(), " T12=", temp12.get_celsius(), " T13=", temp13.get_celsius(), " T14=", temp14.get_celsius(),
 	    " T15=", temp15.get_celsius(), " T16=", temp16.get_celsius(), " degC");
 
-	send_info<Crc>("B01=", flc01.get_tesla() * 1e6, " B02=", flc02.get_tesla() * 1e6, " B03=", flc03.get_tesla() * 1e6, " B04=", flc04.get_tesla() * 1e6, " B05=", flc05.get_tesla() * 1e6, " B06=", flc06.get_tesla() * 1e6,
+	common::println("B01=", flc01.get_tesla() * 1e6, " B02=", flc02.get_tesla() * 1e6, " B03=", flc03.get_tesla() * 1e6, " B04=", flc04.get_tesla() * 1e6, " B05=", flc05.get_tesla() * 1e6, " B06=", flc06.get_tesla() * 1e6,
 	    " B07=", flc07.get_tesla() * 1e6, " B08=", flc08.get_tesla() * 1e6, " B09=", flc09.get_tesla() * 1e6, " B10=", flc10.get_tesla() * 1e6, " B11=", flc11.get_tesla() * 1e6, " B12=", flc12.get_tesla() * 1e6,
 	    " B13=", flc13.get_tesla() * 1e6, " B14=", flc14.get_tesla() * 1e6, " B15=", flc15.get_tesla() * 1e6, " B16=", flc16.get_tesla() * 1e6, " uT");
 
@@ -260,6 +260,5 @@ static void send_time_compare() {
 }
 
 void loop() {
-	loop_frames();
-	send_time_compare();
+	loop_print();
 }
