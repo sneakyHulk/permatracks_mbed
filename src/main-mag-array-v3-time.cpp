@@ -121,7 +121,12 @@ static void setup_usb(char const* const hello) {
 
 // clock: begin, then sync with the host (blocks until the host sends its SOF sync, host side: data_collection UsbSofSync.h)
 static void setup_clock() {
-	if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
+	// until it runs: without it every time stamp is 0 (a sync does not start it)
+	for (auto begun = sof_clock.begin(); !begun; begun = sof_clock.begin()) {
+		send_info<Crc>("UsbSofClock begin failed: ", begun.error().what(), " (", begun.error().code, "), retry");
+		delay(100);
+	}
+	send_info<Crc>("UsbSofClock running, ", sof_clock.ticks_per_sof, " TIM8 ticks per SOF");
 	if (auto const synced = sof_clock.sync(host_parser); !synced) {
 		send_info<Crc>("UsbSofClock: ", synced.error().what());
 	} else {
