@@ -25,6 +25,7 @@ struct UsbSofClock {
 	UsbSofFrames frames;                         // exact frames since the synced frame (TIM5 + DSTS)
 	std::uint32_t ps_per_frame = 1'000'000'000;  // length of one USB frame in host time (ps), nominal 1 ms until synced
 	std::uint32_t ticks_per_sof = 30'000;        // TIM8 ticks per USB frame (SOF to SOF), measured in begin()
+	bool running = false;                        // begin() succeeded: TIM5 and TIM8 count
 
 	// call after the USB enumeration (SOFs are flowing)
 	//
@@ -77,11 +78,15 @@ struct UsbSofClock {
 
 		ticks_per_sof = max_cnt;
 		frames.anchor(usb_frame());  // without a sync: count from now
+		running = true;
 		return {};
 	}
 
-	// host time in ns
+	// host time in ns, 0 before begin() succeeded: TIM8 does not count yet, the wait below would never end
+	// (e.g. the first info frames are sent before begin(), with now() in their header)
 	[[nodiscard]] std::uint64_t now() const {
+		if (!running) return 0;
+
 		// frame number (DSTS) and TIM8 ticks must belong to the same frame:
 		//  - a SOF between the reads changes DSTS -> read again
 		//  - DSTS and the TIM8 reset come from the same SOF, but a few µs apart (TIM8 is even reset twice, by the SOF doublet):

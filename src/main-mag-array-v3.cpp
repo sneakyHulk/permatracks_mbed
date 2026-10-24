@@ -1,3 +1,5 @@
+// Measuring firmware of mag-array-v3. The time test (main-mag-array-v3-time.cpp) runs the same clock, sensors, loop_frames()
+// and drain_host() (keep both in step). The only clock is sof_clock (usb_sof.h): every time stamp comes from sof_clock.now().
 #include <ADS131E08.h>
 #include <Arduino.h>
 #include <FLC100.h>
@@ -9,36 +11,25 @@
 #include <TemperatureDataRaw.h>
 #include <WireMessages.h>
 #include <common_parser.h>
-#include <ntp.h>
 #include <usb_sof.h>
-#include <usb_sof_ms.h>
-#include <wait_for.h>
 
-#include <algorithm>
 #include <array>
 #include <boost/crc.hpp>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <tuple>
 #include <variant>
 
 using Crc = boost::crc_16_type;
 using TemperatureMessage = TemperatureDataRawWireMessage<16>;
 using MagMessage = MagneticFluxDensityRawWireMessage<16, MagneticFluxDensityDataRawFLC100>;
 
-// bytes from the host: ntp time sync responses, USB SOF syncs and pings
-static common::Parser<Header, Crc, TimeSyncResponseWireMessage, SofSyncWireMessage, PingRequestWireMessage> host_parser;
+// bytes from the host: the USB SOF sync and pings (everything else is dropped)
+static common::Parser<Header, Crc, SofSyncWireMessage, PingRequestWireMessage> host_parser;
 
-// host time (micros() + offset of the ntp time sync in setup())
-static NtpClock ntp_clock;
-
-// host-locked ms from the USB SOF (TIM5) and the time since the last SOF (TIM8), see usb_sof.h
+// the only clock: host time in ns from the USB SOF (TIM5 + USB frame number) and the time since the last SOF (TIM8), see usb_sof.h
 static UsbSofClock sof_clock;
-
-// host-locked ms from the USB SOF only (TIM5, start of the current ms), see usb_sof_ms.h; compared against sof_clock in send_time_compare()
-static UsbSofMsClock sof_ms_clock;
 
 // info frame [I][header][text: n][n][crc][I], the text is formatted by Arduino's Print::print, at most 255 characters.
 // InfoPrint is a Print: every formatted character arrives in write(), goes on to Serial and into the checksum and length
@@ -55,7 +46,7 @@ static void send_info(auto const&... args) {
 			return 1;
 		}
 	} info;
-	Header const header{1000ULL * micros()};  // send time, device clock
+	Header const header{sof_clock.now()};  // send time, host time (0 before the clock runs)
 
 	Serial.write('I');
 	for (auto const byte : std::as_bytes(std::span{&header, 1})) info.write(static_cast<std::uint8_t>(byte));
@@ -67,8 +58,6 @@ static void send_info(auto const&... args) {
 	for (std::size_t k = 0; k < common::checksum_size<C>; ++k) Serial.write(static_cast<std::uint8_t>(info.crc.checksum() >> (8 * k)));
 	Serial.write('I');
 }
-
-static bool led_state = LOW;
 
 // One ADC driver each. tmp_adc1: PA/PC/PB channels. tmp_adc3: the PC2_C/PC3_C pads.
 static H7Adc tmp_adc1(ADC1);
@@ -117,6 +106,102 @@ static FLC100 flc14(mag_adc, 10);
 static FLC100 flc15(mag_adc, 9);
 static FLC100 flc16(mag_adc, 8);
 
+// USB serial up, waits for the host to open the port (SOFs flow from then on), says hello
+static void setup_usb(char const* const hello) {
+	Serial.begin();
+	while (!Serial) {
+	}  // wait for enumeration → USB SOFs are now flowing
+	send_info<Crc>(hello);
+	send_info<Crc>("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
+}
+
+// clock: begin, then sync with the host (blocks until the host sends its SOF sync, host side: data_collection UsbSofSync.h)
+static void setup_clock() {
+	if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
+	if (auto const synced = sof_clock.sync(host_parser); !synced) {
+		send_info<Crc>("UsbSofClock: ", synced.error().what());
+	} else {
+		send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+	}
+}
+
+// temperature ADCs and both ADS131E08, sampling from the end of this on
+static void setup_sensors() {
+	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
+	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
+
+	{  // how long do all temperature conversions take? (must stay well below the 1 ms mag frame period)
+		std::uint64_t const t0 = sof_clock.now();
+		tmp_adc1.read();
+		tmp_adc3.read();
+		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", static_cast<unsigned long>((sof_clock.now() - t0) / 1000), " us (budget: 1000 us per mag frame)");
+	}
+
+	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
+	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
+	mag_adc.self_test();  // both chips on the internal test signal: all 16 channels ~ -3495 + offset, status words 0xC...
+	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
+}
+
+// Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
+// Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 1 kSPS on its own oscillator): one call ≈ 1 ms.
+// measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: host time (sof_clock) when sent.
+static void loop_frames() {
+	{                     // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
+		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
+		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
+
+		TemperatureMessage message{};
+		message.measurement_timestamp = sof_clock.now();
+		message.offset = MCP9700B::get_offset();
+		message.scale = MCP9700B::get_scale_factor();
+		message.data = {temp01.get_measurement(), temp02.get_measurement(), temp03.get_measurement(), temp04.get_measurement(), temp05.get_measurement(), temp06.get_measurement(), temp07.get_measurement(), temp08.get_measurement(),
+		    temp09.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement()};
+
+		message.timestamp = sof_clock.now();  // send time, host time
+		auto const frame = common::encode<Crc>(message);
+		Serial.write(frame.data(), frame.size());
+	}
+
+	{                    // [M][send time][measurement time][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
+		mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
+
+		MagMessage message{};
+		message.measurement_timestamp = sof_clock.now();
+		message.scale = static_cast<std::int32_t>(std::lround(FLC100<ADS131E08<true>>::get_scale_factor() * 1e-6));  // LSB per uT (LSB per tesla does not fit into int32)
+		message.data = {flc01.get_measurement(), flc02.get_measurement(), flc03.get_measurement(), flc04.get_measurement(), flc05.get_measurement(), flc06.get_measurement(), flc07.get_measurement(), flc08.get_measurement(),
+		    flc09.get_measurement(), flc10.get_measurement(), flc11.get_measurement(), flc12.get_measurement(), flc13.get_measurement(), flc14.get_measurement(), flc15.get_measurement(), flc16.get_measurement()};
+
+		message.timestamp = sof_clock.now();  // send time, host time
+		auto const frame = common::encode<Crc>(message);
+		Serial.write(frame.data(), frame.size());
+	}
+}
+
+// reads what the host sends after the start (all of it, so the USB receive buffer never fills up):
+// a SOF sync re-syncs the clock (blocks up to ~1 ms, so one mag sample can be late), a ping is answered right away with
+// sof_clock.now() (the host checks that it lies between its send and receive time), everything else is dropped
+static void drain_host() {
+	while (Serial.available() > 0) {
+		std::uint8_t const data = static_cast<std::uint8_t>(Serial.read());
+		for (auto result = host_parser.parse(std::span{&data, 1}); result; result = host_parser.parse()) {
+			if (auto const* const sync = std::get_if<SofSyncWireMessage>(&*result)) {
+				sof_clock.sync(*sync);
+				send_info<Crc>("UsbSofClock re-synced, ", sof_clock.ps_per_frame, " ps per frame");
+			} else if (auto const* const ping = std::get_if<PingRequestWireMessage>(&*result)) {
+				PingResponseWireMessage response{};
+				response.time_ns = sof_clock.now();
+				response.t0 = ping->timestamp;
+				response.timestamp = sof_clock.now();  // send time, host time
+				auto const frame = common::encode<Crc>(response);
+				Serial.write(frame.data(), frame.size());
+			}
+		}
+	}
+}
+
+static bool led_state = LOW;
+
 // --- Read the speed the device enumerated at ---
 static const char* usb_link_speed() {
 	switch (std::uint32_t const enumspd = (reinterpret_cast<USB_OTG_DeviceTypeDef*>(reinterpret_cast<std::uint32_t>(USB_OTG_FS) + USB_OTG_DEVICE_BASE)->DSTS >> 1) & 0x3) {
@@ -137,16 +222,15 @@ void usb_throughput_test(std::uint32_t const total_bytes = 262144) {  // default
 	delay(300);  // let the monitor settle
 
 	std::uint32_t sent = 0;
-	std::uint32_t t0 = micros();
-	std::uint32_t guard = t0;
+	std::uint64_t const t0 = sof_clock.now();
 	while (sent < total_bytes) {
-		sent += Serial.write(buf, sizeof(buf));    // blocks until the CDC buffer has room
-		if (micros() - guard > 10000000UL) break;  // 10 s safety: host not draining
+		sent += Serial.write(buf, sizeof(buf));                    // blocks until the CDC buffer has room
+		if (sof_clock.now() - t0 > 10'000'000'000ULL) break;  // 10 s safety: host not draining
 	}
 	Serial.flush();  // wait until everything is actually pushed to the host
-	std::uint32_t const t1 = micros();
+	std::uint64_t const t1 = sof_clock.now();
 
-	float const sec = (t1 - t0) / 1e6f;
+	float const sec = static_cast<float>(t1 - t0) / 1e9f;
 	float const Bps = sent / sec;
 
 	send_info<Crc>("USB throughput: link ", usb_link_speed(), ", sent ", static_cast<unsigned long>(sent), " bytes in ", sec, " s, ", Bps / 1000.0f, " kB/s (", Bps * 8.0f / 1e6f, " Mbit/s)");
@@ -159,86 +243,9 @@ void setup() {
 		digitalWrite(PC11, !led_state);  // led_state == LOW → LED on
 	}
 
-	{  // config Serial over USB
-		Serial.begin();
-		while (!Serial) {
-		}  // wait for enumeration → USB SOFs are now flowing
-		send_info<Crc>("Hello over USB");
-		send_info<Crc>("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
-	}
-
-	{  // clocks: begin all, then sync all with the host (blocking until the host answers)
-		// first SOF, then ntp: the host sends its SOF sync once at the start and answers the ntp requests afterwards
-		// (host side: data_collection test_permatracks_data_collection_common_parser)
-		// both SOF clocks share TIM5 and begin() resets it: ms clock first (counting only), then sof_clock (adds capture / TRGO for TIM8)
-		if (auto const begun = sof_ms_clock.begin(); !begun) send_info<Crc>("UsbSofMsClock: ", begun.error().what(), " (", begun.error().code, ")");
-		if (auto const begun = sof_clock.begin(); !begun) send_info<Crc>("UsbSofClock: ", begun.error().what(), " (", begun.error().code, ")");
-		if (auto const begun = ntp_clock.begin(); !begun) send_info<Crc>("NtpClock: ", begun.error().what(), " (", begun.error().code, ")");
-
-		// the host sends one SOF sync, both SOF clocks take it
-		if (auto const message = wait_for<SofSyncWireMessage>(host_parser); !message) {
-			send_info<Crc>("UsbSofClock: no USB SOF sync from the host");
-		} else {
-			sof_clock.sync(*message);
-			sof_ms_clock.sync(*message);
-			send_info<Crc>("UsbSofClock + UsbSofMsClock synced, ", sof_clock.ps_per_frame, " ps per frame");
-		}
-
-		if (auto const synced = ntp_clock.sync(host_parser); !synced) {
-			send_info<Crc>("NtpClock: ", synced.error().what());
-		} else {
-			send_info<Crc>("NtpClock synced, delay ", static_cast<unsigned long>(ntp_clock.delay / 1000), " us");
-		}
-	}
-
-	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
-	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
-
-	{  // how long do all temperature conversions take? (must stay well below the 1 ms mag frame period)
-		std::uint32_t const t0 = micros();
-		tmp_adc1.read();
-		tmp_adc3.read();
-		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", micros() - t0, " us (budget: 1000 us per mag frame)");
-	}
-
-	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
-	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
-	mag_adc.self_test();  // both chips on the internal test signal: all 16 channels ~ -3495 + offset, status words 0xC...
-	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
-}
-
-// Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
-// measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: device time (micros() * 1000) when sent.
-static void loop_frames() {
-	{                     // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
-		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
-		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
-
-		TemperatureMessage message{};
-		message.measurement_timestamp = sof_clock.now();
-		message.offset = MCP9700B::get_offset();
-		message.scale = MCP9700B::get_scale_factor();
-		message.data = {temp01.get_measurement(), temp02.get_measurement(), temp03.get_measurement(), temp04.get_measurement(), temp05.get_measurement(), temp06.get_measurement(), temp07.get_measurement(), temp08.get_measurement(),
-		    temp09.get_measurement(), temp10.get_measurement(), temp11.get_measurement(), temp12.get_measurement(), temp13.get_measurement(), temp14.get_measurement(), temp15.get_measurement(), temp16.get_measurement()};
-
-		message.timestamp = 1000ULL * micros();  // send time, device clock
-		auto const frame = common::encode<Crc>(message);
-		Serial.write(frame.data(), frame.size());
-	}
-
-	{                    // [M][send time][measurement time][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
-		mag_adc.read();  // wait for DRDY, latch one synchronized 55-byte frame from both ADS131E08
-
-		MagMessage message{};
-		message.measurement_timestamp = sof_clock.now();
-		message.scale = static_cast<std::int32_t>(std::lround(FLC100<ADS131E08<true>>::get_scale_factor() * 1e-6));  // LSB per uT (LSB per tesla does not fit into int32)
-		message.data = {flc01.get_measurement(), flc02.get_measurement(), flc03.get_measurement(), flc04.get_measurement(), flc05.get_measurement(), flc06.get_measurement(), flc07.get_measurement(), flc08.get_measurement(),
-		    flc09.get_measurement(), flc10.get_measurement(), flc11.get_measurement(), flc12.get_measurement(), flc13.get_measurement(), flc14.get_measurement(), flc15.get_measurement(), flc16.get_measurement()};
-
-		message.timestamp = 1000ULL * micros();  // send time, device clock
-		auto const frame = common::encode<Crc>(message);
-		Serial.write(frame.data(), frame.size());
-	}
+	setup_usb("Hello over USB");
+	setup_clock();
+	setup_sensors();
 }
 
 // Human-readable output: temperature in degC and magnetic flux density in uT, one info frame each (time = frame header), once per second.
@@ -258,48 +265,7 @@ static void loop_print() {
 	delay(1000);
 }
 
-// all clocks read right after each other, the host compares them with its arrival time and with each other
-static void send_time_compare() {
-	TimeCompareWireMessage message{};
-	message.ntp_ns = ntp_clock.now();
-	message.sof_ns = sof_clock.now();
-	message.sof_ms_ns = sof_ms_clock.now();
-
-	message.timestamp = 1000ULL * micros();  // send time, device clock
-	auto const frame = common::encode<Crc>(message);
-	Serial.write(frame.data(), frame.size());
-}
-
-// reads what the host sent: a ping is answered right away with both SOF clocks read now, other messages are dropped
-static void poll_host() {
-	while (Serial.available() > 0) {
-		std::uint8_t const data = static_cast<std::uint8_t>(Serial.read());
-		for (auto result = host_parser.parse(std::span{&data, 1}); result; result = host_parser.parse()) {
-			auto const* const ping = std::get_if<PingRequestWireMessage>(&*result);
-			if (!ping) continue;
-
-			PingResponseWireMessage response{};
-			response.sof_ns = sof_clock.now();
-			response.sof_ms_ns = sof_ms_clock.now();
-			response.t0 = ping->timestamp;
-			response.timestamp = 1000ULL * micros();  // send time, device clock
-			auto const frame = common::encode<Crc>(response);
-			Serial.write(frame.data(), frame.size());
-		}
-	}
-}
-
-// every 10 s (host time): how often TIM5 missed or double counted a SOF against the USB frame number (missed SOFs)
-static void report_sof_health() {
-	static std::uint64_t next_ns = sof_clock.now() + 10'000'000'000ULL;
-	if (sof_clock.now() < next_ns) return;
-	next_ns += 10'000'000'000ULL;
-	send_info<Crc>("UsbSofClock: TIM5 vs USB frame number since the sync: ", sof_clock.frames.corrected, " counts corrected, now ", sof_clock.frames.off, " off");
-}
-
 void loop() {
-	loop_frames();
-	send_time_compare();
-	poll_host();
-	report_sof_health();
+	loop_frames();  // binary TemperatureMessage + MagMessage per mag sample (loop_print() is plain text for a serial monitor, the receiver skips it)
+	drain_host();
 }
