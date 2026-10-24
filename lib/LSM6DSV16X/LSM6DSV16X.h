@@ -6,7 +6,6 @@
 #include <GyroDataRaw.h>
 #include <RotationQuaternion.h>
 #include <Wire.h>
-#include <common2.h>
 #include <lsm6dsv16x_reg.h>
 
 #include <cstdint>
@@ -15,16 +14,15 @@
 
 class LSM6DSV16X : public stmdev_ctx_t {
 	constexpr static auto BOOT_TIME = 10;  // ms
-	std::uint16_t num = 0;
 	lsm6dsv16x_fifo_status_t fifo_status;
 	lsm6dsv16x_filt_settling_mask_t filt_settling_mask;
 	lsm6dsv16x_data_ready_t drdy;
-	std::array<std::uint64_t, 0x1E> messages = {};
 
 	lsm6dsv16x_xl_full_scale_t accel_scale = LSM6DSV16X_16g;
 	lsm6dsv16x_gy_full_scale_t gyro_scale = LSM6DSV16X_4000dps;
 
 	void init() const;
+	[[nodiscard]] lsm6dsv16x_fifo_out_raw_t read_fifo_entry() const;  // one FIFO entry (one I2C read)
 
    public:
 	TwoWire *i2c;
@@ -42,8 +40,8 @@ class LSM6DSV16X : public stmdev_ctx_t {
 	static std::int32_t platform_read(void *handle, std::uint8_t reg, std::uint8_t *bufp, std::uint16_t len);
 	static void platform_delay(std::uint32_t ms);
 
-	void start_measurement();
-	void start_measurement_fifo();
+	bool start_measurement();  // reads the data ready flags, true: new accelerometer and/or gyro data
+	std::uint16_t start_measurement_fifo();  // reads the FIFO fill level, returns how many entries are waiting
 
 	[[nodiscard]] std::optional<AccelerationDataRaw> get_measurement_accelerometer() const;
 	[[nodiscard]] float get_scale_factor_accelerometer() const {
@@ -69,9 +67,10 @@ class LSM6DSV16X : public stmdev_ctx_t {
 
 		return NAN;
 	}
-	struct NoData {};
-	std::variant<NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> get_measurement_fifo();
-	std::variant<NoData, RotationQuaternion, GyroBiasVector, GravityVector> get_measurement_sensor_fusion();
+	// one FIFO entry each (call as often as start_measurement_fifo() returned), std::nullopt: an entry of another kind
+	// std::uint64_t: FIFO timestamp (begin_fifo())
+	[[nodiscard]] std::optional<std::variant<AccelerationDataRaw, GyroDataRaw, std::uint64_t>> get_measurement_fifo() const;
+	[[nodiscard]] std::optional<std::variant<RotationQuaternion, GyroBiasVector, GravityVector>> get_measurement_sensor_fusion() const;
 
 	static float npy_half_to_float(std::uint16_t h);
 	static std::array<float, 4> sflp2q(std::array<std::uint16_t, 3> sflp);

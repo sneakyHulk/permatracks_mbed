@@ -1,5 +1,6 @@
 // Measuring firmware of mag-array-v3. The time test (main-mag-array-v3-time.cpp) runs the same clock, sensors, loop_frames()
 // and drain_host() (keep both in step). The only clock is sof_clock (usb_sof.h): every time stamp comes from sof_clock.now().
+#include <LSM6DSV16X.h>
 #include <ADS131E08.h>
 #include <Arduino.h>
 #include <FLC100.h>
@@ -9,6 +10,7 @@
 #include <MagneticFluxDensityDataRawFLC100.h>
 #include <SPI.h>
 #include <TemperatureDataRaw.h>
+#include <Wire.h>
 #include <WireMessages.h>
 #include <common_parser.h>
 #include <usb_sof.h>
@@ -106,6 +108,10 @@ static FLC100 flc14(mag_adc, 10);
 static FLC100 flc15(mag_adc, 9);
 static FLC100 flc16(mag_adc, 8);
 
+// --- IMU: LSM6DSV16X on I2C1 (SDA1=PB7, SCL1=PB6), address 0x6A (SDO/SA0 low) ---
+static TwoWire i2c1(PB7, PB6);
+static LSM6DSV16X imu(&i2c1, 0b110'1010);
+
 // USB serial up, waits for the host to open the port (SOFs flow from then on), says hello
 static void setup_usb(char const* const hello) {
 	Serial.begin();
@@ -143,6 +149,15 @@ static void setup_sensors() {
 	mag_adc.start();      // RDATAC + START last: both chips sample synchronously from here on
 }
 
+// LSM6DSV16X: I2C1 up, then the class does the rest like in mag-array-v2: sensor fusion (game rotation, gravity, gyro bias) at 120 Hz
+// into the FIFO (prints its steps as plain text)
+static void setup_imu() {
+	i2c1.begin();
+	i2c1.setClock(400'000);
+	imu.begin_sensor_fusion();
+	send_info<Crc>("LSM6DSV16X running, sensor fusion 120 Hz");
+}
+
 // Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
 // Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 1 kSPS on its own oscillator): one call ≈ 1 ms.
 // measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: host time (sof_clock) when sent.
@@ -161,6 +176,36 @@ static void loop_frames() {
 		message.timestamp = sof_clock.now();  // send time, host time
 		auto const frame = common::encode<Crc>(message);
 		Serial.write(frame.data(), frame.size());
+	}
+
+	{  // [Q] / [V] / [B][send time][measurement time = 0][data][crc16][Q] / [V] / [B]: every sensor fusion value of the LSM6DSV16X FIFO, like mag-array-v2
+		// no waiting: every loop the FIFO fill level (one I2C read, ~0.1 ms), then every entry waiting (~0.25 ms each), nothing more when it is empty
+		for (auto n = imu.start_measurement_fifo(); n > 0; --n) {  // FIFO fill level: 0 = nothing to do this loop
+			auto const value = imu.get_measurement_sensor_fusion();
+			if (!value) continue;  // an entry of another kind
+			if (std::holds_alternative<RotationQuaternion>(*value)) {
+				QuaternionWireMessage message{};
+				message.measurement_timestamp = 0;  // not known (the FIFO has no time stamps for sensor fusion)
+				message.data = std::get<RotationQuaternion>(*value);
+				message.timestamp = sof_clock.now();  // send time, host time
+				auto const frame = common::encode<Crc>(message);
+				Serial.write(frame.data(), frame.size());
+			} else if (std::holds_alternative<GravityVector>(*value)) {
+				GravityWireMessage message{};
+				message.measurement_timestamp = 0;  // not known (the FIFO has no time stamps for sensor fusion)
+				message.data = std::get<GravityVector>(*value);
+				message.timestamp = sof_clock.now();  // send time, host time
+				auto const frame = common::encode<Crc>(message);
+				Serial.write(frame.data(), frame.size());
+			} else if (std::holds_alternative<GyroBiasVector>(*value)) {
+				GyroBiasWireMessage message{};
+				message.measurement_timestamp = 0;  // not known (the FIFO has no time stamps for sensor fusion)
+				message.data = std::get<GyroBiasVector>(*value);
+				message.timestamp = sof_clock.now();  // send time, host time
+				auto const frame = common::encode<Crc>(message);
+				Serial.write(frame.data(), frame.size());
+			}
+		}
 	}
 
 	{                    // [M][send time][measurement time][scale][16 x MagneticFluxDensityDataRawFLC100][crc16][M], B[uT] = datapoint / scale
@@ -245,7 +290,8 @@ void setup() {
 
 	setup_usb("Hello over USB");
 	setup_clock();
-	setup_sensors();
+	setup_imu();
+	setup_sensors();  // last: the ADS131E08 sample from its end on
 }
 
 // Human-readable output: temperature in degC and magnetic flux density in uT, one info frame each (time = frame header), once per second.

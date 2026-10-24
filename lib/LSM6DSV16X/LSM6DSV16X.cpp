@@ -1,7 +1,7 @@
 #include "LSM6DSV16X.h"
 
 #include <Arduino.h>
-#include <common2.h>
+#include <common_output.h>
 
 #include <bit>
 #include <cstring>
@@ -27,18 +27,18 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	 * Accelerometer Self Test
 	 */
 	/* Set Output Data Rate */
-	common2::println("Set Output Data Rate");
+	common::println_loc("Set Output Data Rate");
 	lsm6dsv16x_xl_data_rate_set(dev_ctx, LSM6DSV16X_ODR_AT_60Hz);
 	dev_ctx->mdelay(100);
 	/* Set full scale */
-	common2::println("Set full scale");
+	common::println_loc("Set full scale");
 	lsm6dsv16x_xl_full_scale_set(dev_ctx, LSM6DSV16X_4g);
 	/* Wait stable output */
 	dev_ctx->mdelay(100);
 
 	/* Check if new value available */
 	do {
-		common2::println("Check if new value available");
+		common::println_loc("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_xl);
@@ -46,7 +46,7 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	dev_ctx->mdelay(100);
 
 	/* Read dummy data and discard it */
-	common2::println("Read dummy data and discard it");
+	common::println_loc("Read dummy data and discard it");
 	lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
 	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
@@ -55,13 +55,13 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
-			common2::println("Check if new value available");
+			common::println_loc("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_xl);
 
 		/* Read data and accumulate the mg value */
-		common2::println("Read data and accumulate the mg value");
+		common::println_loc("Read data and accumulate the mg value");
 		lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
 		dev_ctx->mdelay(100);
 
@@ -76,7 +76,7 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	}
 
 	/* Enable Self Test positive (or negative) */
-	common2::println("Enable Self Test positive (or negative)");
+	common::println_loc("Enable Self Test positive (or negative)");
 	lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_NEGATIVE);
 	// lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_POSITIVE);
 	/* Wait stable output */
@@ -84,13 +84,13 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 
 	/* Check if new value available */
 	do {
-		common2::println("Check if new value available");
+		common::println_loc("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_xl);
 
 	/* Read dummy data and discard it */
-	common2::println("Read dummy data and discard it");
+	common::println_loc("Read dummy data and discard it");
 	lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
 	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
@@ -99,13 +99,13 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
-			common2::println("Check if new value available");
+			common::println_loc("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_xl);
 
 		/* Read data and accumulate the mg value */
-		common2::println("Read data and accumulate the mg value");
+		common::println_loc("Read data and accumulate the mg value");
 		lsm6dsv16x_acceleration_raw_get(dev_ctx, data_raw);
 		dev_ctx->mdelay(100);
 
@@ -129,44 +129,44 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 
 	for (i = 0; i < 3; i++) {
 		if ((MIN_ST_LIMIT_mg > test_val[i]) || (test_val[i] > MAX_ST_LIMIT_mg)) {
-			common2::println(MIN_ST_LIMIT_mg, " > ", test_val[i], " > ", MAX_ST_LIMIT_mg);
+			common::println_loc(MIN_ST_LIMIT_mg, " > ", test_val[i], " > ", MAX_ST_LIMIT_mg);
 			st_result = ST_FAIL;
 		}
 	}
 
 	/* Disable Self Test */
-	common2::println("Disable Self Test");
+	common::println_loc("Disable Self Test");
 	lsm6dsv16x_xl_self_test_set(dev_ctx, LSM6DSV16X_XL_ST_DISABLE);
 	dev_ctx->mdelay(100);
 	/* Disable sensor. */
-	common2::println("Disable sensor");
+	common::println_loc("Disable sensor");
 	lsm6dsv16x_xl_data_rate_set(dev_ctx, LSM6DSV16X_ODR_OFF);
 	dev_ctx->mdelay(100);
 
-	if (st_result == ST_PASS) common2::println("Accelerometer OK!");
+	if (st_result == ST_PASS) common::println_loc("Accelerometer OK!");
 
 	/*
 	 * Gyroscope Self Test
 	 */
 	/* Set Output Data Rate */
-	common2::println("Set Output Data Rate");
+	common::println_loc("Set Output Data Rate");
 	lsm6dsv16x_gy_data_rate_set(dev_ctx, LSM6DSV16X_ODR_AT_240Hz);
 	dev_ctx->mdelay(100);
 	/* Set full scale */
-	common2::println("Set full scale");
+	common::println_loc("Set full scale");
 	lsm6dsv16x_gy_full_scale_set(dev_ctx, LSM6DSV16X_2000dps);
 	/* Wait stable output */
 	dev_ctx->mdelay(100);
 
 	/* Check if new value available */
 	do {
-		common2::println("Check if new value available");
+		common::println_loc("Check if new value available");
 		lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 		dev_ctx->mdelay(100);
 	} while (!drdy.drdy_gy);
 
 	/* Read dummy data and discard it */
-	common2::println("Read dummy data and discard it");
+	common::println_loc("Read dummy data and discard it");
 	lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
 	dev_ctx->mdelay(100);
 	/* Read 5 sample and get the average vale for each axis */
@@ -175,13 +175,13 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
-			common2::println("Check if new value available");
+			common::println_loc("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_gy);
 
 		/* Read data and accumulate the mg value */
-		common2::println("Read data and accumulate the mg value");
+		common::println_loc("Read data and accumulate the mg value");
 		lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
 		dev_ctx->mdelay(100);
 
@@ -196,7 +196,7 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	}
 
 	/* Enable Self Test positive (or negative) */
-	common2::println("Enable Self Test positive (or negative)");
+	common::println_loc("Enable Self Test positive (or negative)");
 	lsm6dsv16x_gy_self_test_set(dev_ctx, LSM6DSV16X_GY_ST_POSITIVE);
 	// lsm6dsv16x_gy_self_test_set(dev_ctx, LIS2DH12_GY_ST_NEGATIVE);
 	/* Wait stable output */
@@ -207,13 +207,13 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	for (i = 0; i < 5; i++) {
 		/* Check if new value available */
 		do {
-			common2::println("Check if new value available");
+			common::println_loc("Check if new value available");
 			lsm6dsv16x_flag_data_ready_get(dev_ctx, &drdy);
 			dev_ctx->mdelay(100);
 		} while (!drdy.drdy_gy);
 
 		/* Read data and accumulate the mg value */
-		common2::println("Read data and accumulate the mg value");
+		common::println_loc("Read data and accumulate the mg value");
 		lsm6dsv16x_angular_rate_raw_get(dev_ctx, data_raw);
 		dev_ctx->mdelay(100);
 
@@ -235,21 +235,21 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 	/* Check self test limit */
 	for (i = 0; i < 3; i++) {
 		if ((MIN_ST_LIMIT_mdps > test_val[i]) || (test_val[i] > MAX_ST_LIMIT_mdps)) {
-			common2::println(MIN_ST_LIMIT_mdps, " > ", test_val[i], " > ", MAX_ST_LIMIT_mdps);
+			common::println_loc(MIN_ST_LIMIT_mdps, " > ", test_val[i], " > ", MAX_ST_LIMIT_mdps);
 			st_result = ST_FAIL;
 		}
 	}
 
 	/* Disable Self Test */
-	common2::println("Disable Self Test");
+	common::println_loc("Disable Self Test");
 	lsm6dsv16x_gy_self_test_set(dev_ctx, LSM6DSV16X_GY_ST_DISABLE);
 	dev_ctx->mdelay(100);
 	/* Disable sensor. */
-	common2::println("Disable sensor");
+	common::println_loc("Disable sensor");
 	lsm6dsv16x_gy_data_rate_set(dev_ctx, LSM6DSV16X_ODR_OFF);
 	dev_ctx->mdelay(100);
 
-	if (st_result == ST_PASS) common2::println("Gyro OK!");
+	if (st_result == ST_PASS) common::println_loc("Gyro OK!");
 
 	return st_result;
 }
@@ -257,73 +257,73 @@ std::uint8_t self_test(const stmdev_ctx_t* dev_ctx) {
 void LSM6DSV16X::init() const {
 	platform_delay(100 * BOOT_TIME);
 
-	common2::print("Reboot device...");
+	common::print_loc("Reboot device...");
 	lsm6dsv16x_reboot(this);
 
 	platform_delay(100 * BOOT_TIME);
 
-	common2::print("Check reboot and check reset...");
+	common::print_loc("Check reboot and check reset...");
 	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
+		common::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Software reset...");
+	common::print_loc("Software reset...");
 	lsm6dsv16x_sw_reset(this);
 
-	common2::print("Check reboot and check reset...");
+	common::print_loc("Check reboot and check reset...");
 	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
-		common2::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
+		common::print("Error! BOOT: ", static_cast<std::uint8_t>(ctrl3.boot), "/0 SW_RESET: ", static_cast<std::uint8_t>(ctrl3.sw_reset), "/0! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	// Check device ID
-	common2::print("Check device ID...");
+	common::print_loc("Check device ID...");
 	for (std::uint8_t id; lsm6dsv16x_device_id_get(this, &id) && id != LSM6DSV16X_ID;) {
-		common2::print("Error! ID: ", id, "/", " Retry...");
+		common::print("Error! ID: ", id, "/", " Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Enable Auto Increment...");
+	common::print_loc("Enable Auto Increment...");
 	for (std::uint8_t val; lsm6dsv16x_auto_increment_get(this, &val) || val != PROPERTY_ENABLE;) {
-		common2::print(val, "/", PROPERTY_ENABLE, "...");
+		common::print(val, "/", PROPERTY_ENABLE, "...");
 		for (; lsm6dsv16x_auto_increment_set(this, PROPERTY_ENABLE);) {
-			common2::print("...Error! Retry");
+			common::print("...Error! Retry");
 			delay(100);
 		}
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	// Restore default configuration
-	common2::print("Restore default configuration...");
+	common::print_loc("Restore default configuration...");
 	for (; lsm6dsv16x_sw_por(this);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Enable Block Data Update...");
+	common::print_loc("Enable Block Data Update...");
 	for (std::uint8_t val; lsm6dsv16x_block_data_update_get(this, &val) || val != PROPERTY_ENABLE;) {
-		common2::print(val, "/", PROPERTY_ENABLE, "...");
+		common::print(val, "/", PROPERTY_ENABLE, "...");
 		for (; lsm6dsv16x_block_data_update_set(this, PROPERTY_ENABLE);) {
-			common2::print("...Error! Retry");
+			common::print("...Error! Retry");
 			delay(100);
 		}
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	// Disable Sensor Hub
-	// common2::print("Disable Sensor hub I2C master...");
+	// common::print_loc("Disable Sensor hub I2C master...");
 	// for (; lsm6dsv16x_sh_master_set(this, PROPERTY_DISABLE);) {
-	// 	common2::print("Error! Retry...");
+	// 	common::print("Error! Retry...");
 	// 	delay(100);
 	// }
-	// common2::println("Done!");
+	// common::println("Done!");
 }
 
 LSM6DSV16X::LSM6DSV16X(TwoWire* i2c, std::uint8_t const device_address) : stmdev_ctx_t{.write_reg = platform_write, .read_reg = platform_read, .mdelay = platform_delay, .handle = this}, i2c(i2c), device_address(device_address) {}
@@ -343,73 +343,73 @@ void LSM6DSV16X::begin(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6d
 	init();
 
 	// Set full scale
-	common2::print("Set Accelerometer full scale...");
+	common::print_loc("Set Accelerometer full scale...");
 	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set Gyro full scale...");
+	common::println("Done!");
+	common::print_loc("Set Gyro full scale...");
 	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	// Set Output Data Rate.
 	// Selected data rate have to be equal or greater with respect with MLC data rate.
-	common2::print("Set Accelerometer Output Data Rate...");
+	common::print_loc("Set Accelerometer Output Data Rate...");
 	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_7Hz5);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	delay(100);
 
-	common2::print("Set Gyro Output Data Rate...");
+	common::print_loc("Set Gyro Output Data Rate...");
 	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
 	delay(100);
 
 	// Configure filtering chain
-	common2::print("Set Settling Mask...");
+	common::print_loc("Set Settling Mask...");
 	filt_settling_mask.drdy = PROPERTY_ENABLE;
 	filt_settling_mask.irq_xl = PROPERTY_ENABLE;
 	filt_settling_mask.irq_g = PROPERTY_ENABLE;
 	for (; lsm6dsv16x_filt_settling_mask_set(this, filt_settling_mask);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Enable Gyro LP1...");
+	common::println("Done!");
+	common::print_loc("Enable Gyro LP1...");
 	for (; lsm6dsv16x_filt_gy_lp1_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set Gyro LP1 bandwidth...");
+	common::println("Done!");
+	common::print_loc("Set Gyro LP1 bandwidth...");
 	for (; lsm6dsv16x_filt_gy_lp1_bandwidth_set(this, LSM6DSV16X_GY_ULTRA_LIGHT);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Enable Accelerometer LP2...");
+	common::println("Done!");
+	common::print_loc("Enable Accelerometer LP2...");
 	for (; lsm6dsv16x_filt_xl_lp2_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set Accelerometer LP2 bandwidth...");
+	common::println("Done!");
+	common::print_loc("Set Accelerometer LP2 bandwidth...");
 	for (; lsm6dsv16x_filt_xl_lp2_bandwidth_set(this, LSM6DSV16X_XL_STRONG);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 }
 void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
 	accel_scale = accel_scale_value;
@@ -417,75 +417,75 @@ void LSM6DSV16X::begin_fifo(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 
 	init();
 
-	common2::print("Set Accelerometer full scale...");
+	common::print_loc("Set Accelerometer full scale...");
 	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale_value);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Gyro full scale...");
+	common::print_loc("Set Gyro full scale...");
 	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale_value);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO watermark...");
+	common::print_loc("Set FIFO watermark...");
 	for (; lsm6dsv16x_fifo_watermark_set(this, 64);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO batch Accelerometer ODR to 60Hz...");
+	common::print_loc("Set FIFO batch Accelerometer ODR to 60Hz...");
 	for (; lsm6dsv16x_fifo_xl_batch_set(this, LSM6DSV16X_XL_BATCHED_AT_60Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO batch Gyro ODR to 12.5Hz...");
+	common::print_loc("Set FIFO batch Gyro ODR to 12.5Hz...");
 	for (; lsm6dsv16x_fifo_gy_batch_set(this, LSM6DSV16X_GY_BATCHED_AT_15Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO mode to Stream mode (aka Continuous Mode)...");
+	common::print_loc("Set FIFO mode to Stream mode (aka Continuous Mode)...");
 	for (; lsm6dsv16x_fifo_mode_set(this, LSM6DSV16X_STREAM_MODE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Accelerometer Output Data Rate...");
+	common::print_loc("Set Accelerometer Output Data Rate...");
 	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Gyro Output Data Rate...");
+	common::print_loc("Set Gyro Output Data Rate...");
 	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_15Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Timestamp Rate...");
+	common::print_loc("Set Timestamp Rate...");
 	for (; lsm6dsv16x_fifo_timestamp_batch_set(this, LSM6DSV16X_TMSTMP_DEC_8);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Enable Timestamp...");
+	common::print_loc("Enable Timestamp...");
 	for (; lsm6dsv16x_timestamp_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 }
 void LSM6DSV16X::begin_sensor_fusion(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
 	accel_scale = accel_scale_value;
@@ -494,74 +494,74 @@ void LSM6DSV16X::begin_sensor_fusion(lsm6dsv16x_xl_full_scale_t const accel_scal
 	init();
 
 	// Set full scale
-	common2::print("Set Accelerometer full scale...");
+	common::print_loc("Set Accelerometer full scale...");
 	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set Gyro full scale...");
+	common::println("Done!");
+	common::print_loc("Set Gyro full scale...");
 	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO watermark...");
+	common::print_loc("Set FIFO watermark...");
 	for (; lsm6dsv16x_fifo_watermark_set(this, 128);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set FIFO batch of sflp data...");
+	common::println("Done!");
+	common::print_loc("Set FIFO batch of sflp data...");
 	lsm6dsv16x_fifo_sflp_raw_t fifo_sflp{.game_rotation = 1, .gravity = 1, .gbias = 1};
 	for (; lsm6dsv16x_fifo_sflp_batch_set(this, fifo_sflp);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO mode to Stream mode (aka Continuous Mode)...");
+	common::print_loc("Set FIFO mode to Stream mode (aka Continuous Mode)...");
 	for (; lsm6dsv16x_fifo_mode_set(this, LSM6DSV16X_STREAM_MODE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Accelerometer Output Data Rate...");
+	common::print_loc("Set Accelerometer Output Data Rate...");
 	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Gyro Output Data Rate...");
+	common::print_loc("Set Gyro Output Data Rate...");
 	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set sflp Output Data Rate...");
+	common::print_loc("Set sflp Output Data Rate...");
 	for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Enable Game Rotation...");
+	common::println("Done!");
+	common::print_loc("Enable Game Rotation...");
 	for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Initialize Gyro Offset...");
+	common::print_loc("Initialize Gyro Offset...");
 	lsm6dsv16x_sflp_gbias_t gbias{.gbias_x = 0.0f, .gbias_y = 0.0f, .gbias_z = 0.0f};
 	for (; lsm6dsv16x_sflp_game_gbias_set(this, &gbias);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 }
 void LSM6DSV16X::begin_both(lsm6dsv16x_xl_full_scale_t const accel_scale_value, lsm6dsv16x_gy_full_scale_t const gyro_scale_value) {
 	accel_scale = accel_scale_value;
@@ -570,150 +570,150 @@ void LSM6DSV16X::begin_both(lsm6dsv16x_xl_full_scale_t const accel_scale_value, 
 	init();
 
 	// Set full scale
-	common2::print("Set Accelerometer full scale...");
+	common::print_loc("Set Accelerometer full scale...");
 	for (; lsm6dsv16x_xl_full_scale_set(this, accel_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set Gyro full scale...");
+	common::println("Done!");
+	common::print_loc("Set Gyro full scale...");
 	for (; lsm6dsv16x_gy_full_scale_set(this, gyro_scale);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO watermark...");
+	common::print_loc("Set FIFO watermark...");
 	for (; lsm6dsv16x_fifo_watermark_set(this, 128);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Set FIFO batch of sflp data...");
+	common::println("Done!");
+	common::print_loc("Set FIFO batch of sflp data...");
 	lsm6dsv16x_fifo_sflp_raw_t fifo_sflp{.game_rotation = 1, .gravity = 1, .gbias = 1};
 	for (; lsm6dsv16x_fifo_sflp_batch_set(this, fifo_sflp);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO batch Gyro ODR to 12.5Hz...");
+	common::print_loc("Set FIFO batch Gyro ODR to 12.5Hz...");
 	for (; lsm6dsv16x_fifo_gy_batch_set(this, LSM6DSV16X_GY_BATCHED_AT_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set FIFO mode to Stream mode (aka Continuous Mode)...");
+	common::print_loc("Set FIFO mode to Stream mode (aka Continuous Mode)...");
 	for (; lsm6dsv16x_fifo_mode_set(this, LSM6DSV16X_STREAM_MODE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Accelerometer Output Data Rate...");
+	common::print_loc("Set Accelerometer Output Data Rate...");
 	for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set Gyro Output Data Rate...");
+	common::print_loc("Set Gyro Output Data Rate...");
 	for (; lsm6dsv16x_gy_data_rate_set(this, LSM6DSV16X_ODR_AT_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Set sflp Output Data Rate...");
+	common::print_loc("Set sflp Output Data Rate...");
 	for (; lsm6dsv16x_sflp_data_rate_set(this, LSM6DSV16X_SFLP_120Hz);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
-	common2::print("Enable Game Rotation...");
+	common::println("Done!");
+	common::print_loc("Enable Game Rotation...");
 	for (; lsm6dsv16x_sflp_game_rotation_set(this, PROPERTY_ENABLE);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Initialize Gyro Offset...");
+	common::print_loc("Initialize Gyro Offset...");
 	lsm6dsv16x_sflp_gbias_t gbias{.gbias_x = 0.0f, .gbias_y = 0.0f, .gbias_z = 0.0f};
 	for (; lsm6dsv16x_sflp_game_gbias_set(this, &gbias);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 }
 void LSM6DSV16X::begin_minimal() const {
 	init();
 
-	common2::print("Enable Accel High-Performance Mode...");
+	common::print_loc("Enable Accel High-Performance Mode...");
 	for (lsm6dsv16x_xl_mode_t val; lsm6dsv16x_xl_mode_get(this, &val) || val != LSM6DSV16X_XL_HIGH_PERFORMANCE_MD;) {
 		switch (val) {
-			case LSM6DSV16X_XL_HIGH_PERFORMANCE_MD: common2::print("LSM6DSV16X_XL_HIGH_PERFORMANCE_MD"); break;
-			case LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD: common2::print("LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD"); break;
-			case LSM6DSV16X_XL_ODR_TRIGGERED_MD: common2::print("LSM6DSV16X_XL_ODR_TRIGGERED_MD"); break;
-			case LSM6DSV16X_XL_LOW_POWER_2_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_2_AVG_MD"); break;
-			case LSM6DSV16X_XL_LOW_POWER_4_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_4_AVG_MD"); break;
-			case LSM6DSV16X_XL_LOW_POWER_8_AVG_MD: common2::print("LSM6DSV16X_XL_LOW_POWER_8_AVG_MD"); break;
-			case LSM6DSV16X_XL_NORMAL_MD: common2::print("LSM6DSV16X_XL_NORMAL_MD"); break;
+			case LSM6DSV16X_XL_HIGH_PERFORMANCE_MD: common::print("LSM6DSV16X_XL_HIGH_PERFORMANCE_MD"); break;
+			case LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD: common::print("LSM6DSV16X_XL_HIGH_ACCURACY_ODR_MD"); break;
+			case LSM6DSV16X_XL_ODR_TRIGGERED_MD: common::print("LSM6DSV16X_XL_ODR_TRIGGERED_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_2_AVG_MD: common::print("LSM6DSV16X_XL_LOW_POWER_2_AVG_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_4_AVG_MD: common::print("LSM6DSV16X_XL_LOW_POWER_4_AVG_MD"); break;
+			case LSM6DSV16X_XL_LOW_POWER_8_AVG_MD: common::print("LSM6DSV16X_XL_LOW_POWER_8_AVG_MD"); break;
+			case LSM6DSV16X_XL_NORMAL_MD: common::print("LSM6DSV16X_XL_NORMAL_MD"); break;
 		}
-		common2::print("/", "LSM6DSV16X_XL_HIGH_PERFORMANCE_MD", "...");
+		common::print("/", "LSM6DSV16X_XL_HIGH_PERFORMANCE_MD", "...");
 		for (; lsm6dsv16x_xl_mode_set(this, LSM6DSV16X_XL_HIGH_PERFORMANCE_MD);) {
-			common2::print("...Error! Retry");
+			common::print("...Error! Retry");
 			delay(100);
 		}
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 
-	common2::print("Select Accel ODR to 60Hz...");
+	common::print_loc("Select Accel ODR to 60Hz...");
 	for (lsm6dsv16x_data_rate_t odr_xl; lsm6dsv16x_xl_data_rate_get(this, &odr_xl) || odr_xl != LSM6DSV16X_ODR_AT_60Hz;) {
 		switch (odr_xl) {
-			case LSM6DSV16X_ODR_OFF: common2::print("LSM6DSV16X_ODR_OFF"); break;
-			case LSM6DSV16X_ODR_AT_1Hz875: common2::print("LSM6DSV16X_ODR_AT_1Hz875"); break;
-			case LSM6DSV16X_ODR_AT_7Hz5: common2::print("LSM6DSV16X_ODR_AT_7Hz5"); break;
-			case LSM6DSV16X_ODR_AT_15Hz: common2::print("LSM6DSV16X_ODR_AT_15Hz"); break;
-			case LSM6DSV16X_ODR_AT_30Hz: common2::print("LSM6DSV16X_ODR_AT_30Hz"); break;
-			case LSM6DSV16X_ODR_AT_60Hz: common2::print("LSM6DSV16X_ODR_AT_60Hz"); break;
-			case LSM6DSV16X_ODR_AT_120Hz: common2::print("LSM6DSV16X_ODR_AT_120Hz"); break;
-			case LSM6DSV16X_ODR_AT_240Hz: common2::print("LSM6DSV16X_ODR_AT_240Hz"); break;
-			case LSM6DSV16X_ODR_AT_480Hz: common2::print("LSM6DSV16X_ODR_AT_480Hz"); break;
-			case LSM6DSV16X_ODR_AT_960Hz: common2::print("LSM6DSV16X_ODR_AT_960Hz"); break;
-			case LSM6DSV16X_ODR_AT_1920Hz: common2::print("LSM6DSV16X_ODR_AT_1920Hz"); break;
-			case LSM6DSV16X_ODR_AT_3840Hz: common2::print("LSM6DSV16X_ODR_AT_3840Hz"); break;
-			case LSM6DSV16X_ODR_AT_7680Hz: common2::print("LSM6DSV16X_ODR_AT_7680Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_15Hz625: common2::print("LSM6DSV16X_ODR_HA01_AT_15Hz625"); break;
-			case LSM6DSV16X_ODR_HA01_AT_31Hz25: common2::print("LSM6DSV16X_ODR_HA01_AT_31Hz25"); break;
-			case LSM6DSV16X_ODR_HA01_AT_62Hz5: common2::print("LSM6DSV16X_ODR_HA01_AT_62Hz5"); break;
-			case LSM6DSV16X_ODR_HA01_AT_125Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_125Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_250Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_250Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_500Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_500Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_1000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_1000Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_2000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_2000Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_4000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_4000Hz"); break;
-			case LSM6DSV16X_ODR_HA01_AT_8000Hz: common2::print("LSM6DSV16X_ODR_HA01_AT_8000Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_12Hz5: common2::print("LSM6DSV16X_ODR_HA02_AT_12Hz5"); break;
-			case LSM6DSV16X_ODR_HA02_AT_25Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_25Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_50Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_50Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_100Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_100Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_200Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_200Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_400Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_400Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_800Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_800Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_1600Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_1600Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_3200Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_3200Hz"); break;
-			case LSM6DSV16X_ODR_HA02_AT_6400Hz: common2::print("LSM6DSV16X_ODR_HA02_AT_6400Hz"); break;
+			case LSM6DSV16X_ODR_OFF: common::print("LSM6DSV16X_ODR_OFF"); break;
+			case LSM6DSV16X_ODR_AT_1Hz875: common::print("LSM6DSV16X_ODR_AT_1Hz875"); break;
+			case LSM6DSV16X_ODR_AT_7Hz5: common::print("LSM6DSV16X_ODR_AT_7Hz5"); break;
+			case LSM6DSV16X_ODR_AT_15Hz: common::print("LSM6DSV16X_ODR_AT_15Hz"); break;
+			case LSM6DSV16X_ODR_AT_30Hz: common::print("LSM6DSV16X_ODR_AT_30Hz"); break;
+			case LSM6DSV16X_ODR_AT_60Hz: common::print("LSM6DSV16X_ODR_AT_60Hz"); break;
+			case LSM6DSV16X_ODR_AT_120Hz: common::print("LSM6DSV16X_ODR_AT_120Hz"); break;
+			case LSM6DSV16X_ODR_AT_240Hz: common::print("LSM6DSV16X_ODR_AT_240Hz"); break;
+			case LSM6DSV16X_ODR_AT_480Hz: common::print("LSM6DSV16X_ODR_AT_480Hz"); break;
+			case LSM6DSV16X_ODR_AT_960Hz: common::print("LSM6DSV16X_ODR_AT_960Hz"); break;
+			case LSM6DSV16X_ODR_AT_1920Hz: common::print("LSM6DSV16X_ODR_AT_1920Hz"); break;
+			case LSM6DSV16X_ODR_AT_3840Hz: common::print("LSM6DSV16X_ODR_AT_3840Hz"); break;
+			case LSM6DSV16X_ODR_AT_7680Hz: common::print("LSM6DSV16X_ODR_AT_7680Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_15Hz625: common::print("LSM6DSV16X_ODR_HA01_AT_15Hz625"); break;
+			case LSM6DSV16X_ODR_HA01_AT_31Hz25: common::print("LSM6DSV16X_ODR_HA01_AT_31Hz25"); break;
+			case LSM6DSV16X_ODR_HA01_AT_62Hz5: common::print("LSM6DSV16X_ODR_HA01_AT_62Hz5"); break;
+			case LSM6DSV16X_ODR_HA01_AT_125Hz: common::print("LSM6DSV16X_ODR_HA01_AT_125Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_250Hz: common::print("LSM6DSV16X_ODR_HA01_AT_250Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_500Hz: common::print("LSM6DSV16X_ODR_HA01_AT_500Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_1000Hz: common::print("LSM6DSV16X_ODR_HA01_AT_1000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_2000Hz: common::print("LSM6DSV16X_ODR_HA01_AT_2000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_4000Hz: common::print("LSM6DSV16X_ODR_HA01_AT_4000Hz"); break;
+			case LSM6DSV16X_ODR_HA01_AT_8000Hz: common::print("LSM6DSV16X_ODR_HA01_AT_8000Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_12Hz5: common::print("LSM6DSV16X_ODR_HA02_AT_12Hz5"); break;
+			case LSM6DSV16X_ODR_HA02_AT_25Hz: common::print("LSM6DSV16X_ODR_HA02_AT_25Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_50Hz: common::print("LSM6DSV16X_ODR_HA02_AT_50Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_100Hz: common::print("LSM6DSV16X_ODR_HA02_AT_100Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_200Hz: common::print("LSM6DSV16X_ODR_HA02_AT_200Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_400Hz: common::print("LSM6DSV16X_ODR_HA02_AT_400Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_800Hz: common::print("LSM6DSV16X_ODR_HA02_AT_800Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_1600Hz: common::print("LSM6DSV16X_ODR_HA02_AT_1600Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_3200Hz: common::print("LSM6DSV16X_ODR_HA02_AT_3200Hz"); break;
+			case LSM6DSV16X_ODR_HA02_AT_6400Hz: common::print("LSM6DSV16X_ODR_HA02_AT_6400Hz"); break;
 		}
-		common2::print("/", "LSM6DSV16X_ODR_AT_60Hz", "...");
+		common::print("/", "LSM6DSV16X_ODR_AT_60Hz", "...");
 		for (; lsm6dsv16x_xl_data_rate_set(this, LSM6DSV16X_ODR_AT_60Hz);) {
-			common2::print("...Error! Retry");
+			common::print("...Error! Retry");
 			delay(100);
 		}
 		delay(100);
 	}
-	common2::println("Done!");
+	common::println("Done!");
 }
 std::int32_t LSM6DSV16X::platform_write(void* handle, std::uint8_t const reg, std::uint8_t const* bufp, std::uint16_t const len) {
 	auto* obj = static_cast<LSM6DSV16X*>(handle);
@@ -738,26 +738,19 @@ std::int32_t LSM6DSV16X::platform_read(void* handle, std::uint8_t const reg, std
 	return 0;
 }
 void LSM6DSV16X::platform_delay(std::uint32_t const ms) { delay(ms); }
-void LSM6DSV16X::start_measurement() {
-	// common2::print("Get Data Ready...");
+bool LSM6DSV16X::start_measurement() {
 	for (; lsm6dsv16x_flag_data_ready_get(this, &drdy);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	// common2::println("Done!");
+	return drdy.drdy_xl || drdy.drdy_gy;
 }
-void LSM6DSV16X::start_measurement_fifo() {
-	// common2::print("Read watermark flag...");
+std::uint16_t LSM6DSV16X::start_measurement_fifo() {
 	for (; lsm6dsv16x_fifo_status_get(this, &fifo_status);) {
-		common2::print("Error! Retry...");
+		common::print("Error! Retry...");
 		delay(100);
 	}
-	// common2::println("Done!");
-
-	// num = 0;
-	if (fifo_status.fifo_th) {
-		num = fifo_status.fifo_level;
-	}
+	return fifo_status.fifo_level;
 }
 
 std::optional<AccelerationDataRaw> LSM6DSV16X::get_measurement_accelerometer() const {
@@ -765,7 +758,7 @@ std::optional<AccelerationDataRaw> LSM6DSV16X::get_measurement_accelerometer() c
 		AccelerationDataRaw accel_data_raw{};
 
 		for (; lsm6dsv16x_acceleration_raw_get(this, accel_data_raw.arr.data());) {
-			common2::print("Error! Retry...");
+			common::print("Error! Retry...");
 			delay(100);
 		}
 
@@ -780,7 +773,7 @@ std::optional<GyroDataRaw> LSM6DSV16X::get_measurement_gyro() const {
 		GyroDataRaw gyro_data_raw{};
 
 		for (; lsm6dsv16x_angular_rate_raw_get(this, gyro_data_raw.arr.data());) {
-			common2::print("Error! Retry...");
+			common::print("Error! Retry...");
 			delay(100);
 		}
 
@@ -790,51 +783,31 @@ std::optional<GyroDataRaw> LSM6DSV16X::get_measurement_gyro() const {
 	return {};
 }
 
-std::variant<LSM6DSV16X::NoData, AccelerationDataRaw, GyroDataRaw, std::uint64_t> LSM6DSV16X::get_measurement_fifo() {
-	for (; num; --num) {
-		lsm6dsv16x_fifo_out_raw_t f_data;
-
-		for (; lsm6dsv16x_fifo_out_raw_get(this, &f_data);) {
-			common2::print("Error! Retry...");
-			delay(100);
-		}
-
-		++messages[f_data.tag];
-
-		switch (f_data.tag) {
-			case LSM6DSV16X_GY_NC_TAG: return GyroDataRaw{.bytes = std::to_array(f_data.data)};
-			case LSM6DSV16X_XL_NC_TAG: return AccelerationDataRaw{.bytes = std::to_array(f_data.data)};
-			case LSM6DSV16X_TIMESTAMP_TAG: return std::uint64_t{std::bit_cast<std::uint32_t>(std::array{f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3]})};
-			default: return NoData{};
-		}
+lsm6dsv16x_fifo_out_raw_t LSM6DSV16X::read_fifo_entry() const {
+	lsm6dsv16x_fifo_out_raw_t f_data;
+	for (; lsm6dsv16x_fifo_out_raw_get(this, &f_data);) {
+		common::print("Error! Retry...");
+		delay(100);
 	}
-
-	common2::println(messages);
-	return NoData{};
+	return f_data;
 }
-std::variant<LSM6DSV16X::NoData, RotationQuaternion, GyroBiasVector, GravityVector> LSM6DSV16X::get_measurement_sensor_fusion() {
-	for (; num; --num) {
-		lsm6dsv16x_fifo_out_raw_t f_data;
 
-		for (; lsm6dsv16x_fifo_out_raw_get(this, &f_data);) {
-			common2::print("Error! Retry...");
-			delay(100);
-		}
-
-		++messages[f_data.tag];
-
-		switch (f_data.tag) {
-			case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return RotationQuaternion{.arr = sflp2q(std::bit_cast<std::array<std::uint16_t, 3>>(std::to_array(f_data.data)))};
-			case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return GyroBiasVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
-			case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
-			// case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return GBiasVectorRaw{.bytes = std::to_array(f_data.data)};
-			// case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVectorRaw{.bytes = std::to_array(f_data.data)};
-			default: return NoData{};
-		}
+std::optional<std::variant<AccelerationDataRaw, GyroDataRaw, std::uint64_t>> LSM6DSV16X::get_measurement_fifo() const {
+	switch (auto const f_data = read_fifo_entry(); f_data.tag) {
+		case LSM6DSV16X_GY_NC_TAG: return GyroDataRaw{.bytes = std::to_array(f_data.data)};
+		case LSM6DSV16X_XL_NC_TAG: return AccelerationDataRaw{.bytes = std::to_array(f_data.data)};
+		case LSM6DSV16X_TIMESTAMP_TAG: return std::uint64_t{std::bit_cast<std::uint32_t>(std::array{f_data.data[0], f_data.data[1], f_data.data[2], f_data.data[3]})};
+		default: return std::nullopt;
 	}
+}
 
-	common2::println(messages);
-	return NoData{};
+std::optional<std::variant<RotationQuaternion, GyroBiasVector, GravityVector>> LSM6DSV16X::get_measurement_sensor_fusion() const {
+	switch (auto const f_data = read_fifo_entry(); f_data.tag) {
+		case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return RotationQuaternion{.arr = sflp2q(std::bit_cast<std::array<std::uint16_t, 3>>(std::to_array(f_data.data)))};
+		case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return GyroBiasVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
+		case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
+		default: return std::nullopt;
+	}
 }
 
 float LSM6DSV16X::npy_half_to_float(std::uint16_t const h) {
