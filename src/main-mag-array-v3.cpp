@@ -136,13 +136,6 @@ static void setup_sensors() {
 	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
 	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
 
-	{  // how long do all temperature conversions take? (must stay well below the 1 ms mag frame period)
-		std::uint64_t const t0 = sof_clock.now();
-		tmp_adc1.read();
-		tmp_adc3.read();
-		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", static_cast<unsigned long>((sof_clock.now() - t0) / 1000), " us (budget: 1000 us per mag frame)");
-	}
-
 	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
 	mag_adc.begin();      // pins, hardware reset, SDATAC, ID check, write + verify registers (logs each step)
 	mag_adc.self_test();  // both chips on the internal test signal: all 16 channels ~ -3495 + offset, status words 0xC...
@@ -247,41 +240,6 @@ static void drain_host() {
 
 static bool led_state = LOW;
 
-// --- Read the speed the device enumerated at ---
-static const char* usb_link_speed() {
-	switch (std::uint32_t const enumspd = (reinterpret_cast<USB_OTG_DeviceTypeDef*>(reinterpret_cast<std::uint32_t>(USB_OTG_FS) + USB_OTG_DEVICE_BASE)->DSTS >> 1) & 0x3) {
-		case 0b11: return "Full Speed (12 Mbit/s)";  // OTG_FS is always this
-		case 0b00: return "High Speed (480 Mbit/s)";
-		case 0b10: return "Low Speed (1.5 Mbit/s)";
-		default: return "Full Speed";
-	}
-}
-
-// --- Measure TX throughput: how fast you can send to the PC ---
-void usb_throughput_test(std::uint32_t const total_bytes = 262144) {  // default 256 KB
-	static uint8_t buf[256];
-	for (uint16_t i = 0; i < sizeof(buf); i++) buf[i] = 'A' + (i % 26);
-
-	while (!Serial) {
-	}  // wait until the host actually opens the port (DTR)
-	delay(300);  // let the monitor settle
-
-	std::uint32_t sent = 0;
-	std::uint64_t const t0 = sof_clock.now();
-	while (sent < total_bytes) {
-		sent += Serial.write(buf, sizeof(buf));                    // blocks until the CDC buffer has room
-		if (sof_clock.now() - t0 > 10'000'000'000ULL) break;  // 10 s safety: host not draining
-	}
-	Serial.flush();  // wait until everything is actually pushed to the host
-	std::uint64_t const t1 = sof_clock.now();
-
-	float const sec = static_cast<float>(t1 - t0) / 1e9f;
-	float const Bps = sent / sec;
-
-	send_info<Crc>("USB throughput: link ", usb_link_speed(), ", sent ", static_cast<unsigned long>(sent), " bytes in ", sec, " s, ", Bps / 1000.0f, " kB/s (", Bps * 8.0f / 1e6f, " Mbit/s)");
-	Serial.flush();
-}
-
 void setup() {
 	{  // turn led on (wiring: 3V3 → resistor → LED → pin, i.e. active-low → LOW = on)
 		pinMode(PC11, OUTPUT);
@@ -289,9 +247,9 @@ void setup() {
 	}
 
 	setup_usb("Hello over USB");
-	setup_clock();
 	setup_imu();
-	setup_sensors();  // last: the ADS131E08 sample from its end on
+	setup_sensors();
+	setup_clock();
 }
 
 // Human-readable output: temperature in degC and magnetic flux density in uT, one info frame each (time = frame header), once per second.
