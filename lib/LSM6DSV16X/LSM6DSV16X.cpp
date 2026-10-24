@@ -807,7 +807,7 @@ std::optional<std::variant<RotationQuaternion, GyroBiasVector, GravityVector>> L
 	switch (auto const f_data = read_fifo_entry(); f_data.tag) {
 		case LSM6DSV16X_SFLP_GAME_ROTATION_VECTOR_TAG: return RotationQuaternion{.arr = sflp2q(std::bit_cast<std::array<std::uint16_t, 3>>(std::to_array(f_data.data)))};
 		case LSM6DSV16X_SFLP_GYROSCOPE_BIAS_TAG: return GyroBiasVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
-		case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVector{.arr = sflp2gbv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
+		case LSM6DSV16X_SFLP_GRAVITY_VECTOR_TAG: return GravityVector{.arr = sflp2gv(std::bit_cast<std::array<std::int16_t, 3>>(std::to_array(f_data.data)))};
 		default: return std::nullopt;
 	}
 }

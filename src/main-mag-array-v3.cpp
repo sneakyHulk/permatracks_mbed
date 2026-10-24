@@ -15,6 +15,7 @@
 #include <common_parser.h>
 #include <usb_sof.h>
 
+#include <algorithm>
 #include <array>
 #include <boost/crc.hpp>
 #include <cmath>
@@ -146,7 +147,7 @@ static void setup_sensors() {
 // into the FIFO (prints its steps as plain text)
 static void setup_imu() {
 	i2c1.begin();
-	i2c1.setClock(400'000);
+	i2c1.setClock(400'000);  // 1 MHz does not work on this board (I2C errors)
 	imu.begin_sensor_fusion();
 	send_info<Crc>("LSM6DSV16X running, sensor fusion 120 Hz");
 }
@@ -172,8 +173,9 @@ static void loop_frames() {
 	}
 
 	{  // [Q] / [V] / [B][send time][measurement time = 0][data][crc16][Q] / [V] / [B]: every sensor fusion value of the LSM6DSV16X FIFO, like mag-array-v2
-		// no waiting: every loop the FIFO fill level (one I2C read, ~0.1 ms), then every entry waiting (~0.25 ms each), nothing more when it is empty
-		for (auto n = imu.start_measurement_fifo(); n > 0; --n) {  // FIFO fill level: 0 = nothing to do this loop
+		// no waiting: every loop the FIFO fill level (one I2C read, ~0.1 ms), then at most one entry (~0.25 ms): more would push the loop over
+		// 1 ms and lose a mag sample. The FIFO fills with ~360 entries/s, the loop takes up to 1000/s.
+		for (auto n = std::min<std::uint16_t>(imu.start_measurement_fifo(), 2); n > 0; --n) {  // FIFO fill level: 0 = nothing to do this loop
 			auto const value = imu.get_measurement_sensor_fusion();
 			if (!value) continue;  // an entry of another kind
 			if (std::holds_alternative<RotationQuaternion>(*value)) {
