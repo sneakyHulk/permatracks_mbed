@@ -259,6 +259,7 @@ void LSM6DSV16X::init() const {
 
 	common::print_loc("Reboot device...");
 	lsm6dsv16x_reboot(this);
+	common::println("Done!");
 
 	platform_delay(100 * BOOT_TIME);
 
@@ -271,6 +272,7 @@ void LSM6DSV16X::init() const {
 
 	common::print_loc("Software reset...");
 	lsm6dsv16x_sw_reset(this);
+	common::println("Done!");
 
 	common::print_loc("Check reboot and check reset...");
 	for (lsm6dsv16x_ctrl3_t ctrl3 = {0}; lsm6dsv16x_read_reg(this, LSM6DSV16X_CTRL3, reinterpret_cast<uint8_t*>(&ctrl3), 1) || ctrl3.boot != 0u || ctrl3.sw_reset != 0u;) {
