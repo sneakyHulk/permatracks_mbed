@@ -122,7 +122,7 @@ static void setup_usb(char const* const hello) {
 	send_info<Crc>("=== BUILD " __DATE__ " " __TIME__ " ===");  // confirms a fresh flash is running
 }
 
-// clock: begin, then sync with the host (blocks until the host sends its SOF sync, host side: data_collection UsbSofSync.h)
+// clock: begin, then sync with the host (asks for it until the host sends its SOF sync, host side: data_collection UsbSofSync.h)
 static void setup_clock() {
 	// until it runs: without it every time stamp is 0 (a sync does not start it)
 	for (auto begun = sof_clock.begin(); !begun; begun = sof_clock.begin()) {
@@ -130,10 +130,21 @@ static void setup_clock() {
 		delay(100);
 	}
 	send_info<Crc>("UsbSofClock running, ", sof_clock.ticks_per_sof, " TIM8 ticks per SOF");
-	if (auto const synced = sof_clock.sync(host_parser); !synced) {
-		send_info<Crc>("UsbSofClock: ", synced.error().what());
-	} else {
-		send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+
+	// ask the host for the sync (SofSyncRequestWireMessage) about once per second until the SofSyncWireMessage arrives
+	// (the host measures ~10 s before it answers and ignores the requests meanwhile; GUI: MagArrayV3Visitor, data_collection: UsbSofSync.h)
+	for (;;) {
+		SofSyncRequestWireMessage request{};
+		request.timestamp = sof_clock.now();  // send time (not synced yet)
+		auto const frame = common::encode<Crc>(request);
+		Serial.write(frame.data(), frame.size());
+
+		if (auto const synced = sof_clock.sync(host_parser, 1'000'000); !synced) {
+			send_info<Crc>("UsbSofClock: ", synced.error().what());
+		} else {
+			send_info<Crc>("UsbSofClock synced, ", sof_clock.ps_per_frame, " ps per frame");
+			break;
+		}
 	}
 }
 
