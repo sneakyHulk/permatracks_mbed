@@ -88,7 +88,7 @@ static MCP9700B temp16(tmp_adc1, ADC_CHANNEL_5);   // PB1
 // SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
 // Arduino pin NUMBERS (PE4, not PE_4): the PinName values are off by 2 on this variant.
 static HalSpi4 spi4;                                               // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
-static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 1 kSPS, 24-bit, VREF=4.096 V
+static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 2 kSPS, 24-bit, VREF=4.096 V
 
 // One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
 // ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
@@ -168,11 +168,14 @@ static void setup_imu() {
 	send_info<Crc>("LSM6DSV16X running, sensor fusion 120 Hz");
 }
 
-// Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
-// Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 1 kSPS on its own oscillator): one call ≈ 1 ms.
+// Binary output: one MagMessage per mag sample, in between alternately one TemperatureMessage or the IMU (each 1 kHz), for common::Parser on the host.
+// Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 2 kSPS on its own oscillator): one call ≈ 500 us, longer loses a mag sample.
 // measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: host time (sof_clock) when sent.
 static void loop_frames() {
-	{                     // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
+	static bool temperature_turn = true;
+	temperature_turn = !temperature_turn;
+
+	if (temperature_turn) {  // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
 		tmp_adc1.read();  // convert + latch every enabled ADC1 channel (temp1..3, temp6..16)
 		tmp_adc3.read();  // convert + latch every enabled ADC3 channel (temp4, temp5)
 
@@ -186,12 +189,10 @@ static void loop_frames() {
 		message.timestamp = sof_clock.now();  // send time, host time
 		auto const frame = common::encode<Crc>(message);
 		Serial.write(frame.data(), frame.size());
-	}
-
-	{  // [Q] / [V] / [B][send time][measurement time = 0][data][crc16][Q] / [V] / [B]: every sensor fusion value of the LSM6DSV16X FIFO, like mag-array-v2
-		// no waiting: every loop the FIFO fill level (one I2C read, ~0.1 ms), then at most one entry (~0.25 ms): more would push the loop over
-		// 1 ms and lose a mag sample. The FIFO fills with ~360 entries/s, the loop takes up to 1000/s.
-		for (auto n = std::min<std::uint16_t>(imu.start_measurement_fifo(), 2); n > 0; --n) {  // FIFO fill level: 0 = nothing to do this loop
+	} else {  // [Q] / [V] / [B][send time][measurement time = 0][data][crc16][Q] / [V] / [B]: every sensor fusion value of the LSM6DSV16X FIFO, like mag-array-v2
+		// no waiting: every 2nd loop the FIFO fill level (one I2C read, ~0.1 ms), then at most one entry (~0.25 ms): more would push the loop over
+		// 500 us and lose a mag sample. The FIFO fills with ~360 entries/s, this takes up to 1000/s.
+		for (auto n = std::min<std::uint16_t>(imu.start_measurement_fifo(), 1); n > 0; --n) {  // FIFO fill level: 0 = nothing to do this loop
 			auto const value = imu.get_measurement_sensor_fusion();
 			if (!value) continue;  // an entry of another kind
 			if (std::holds_alternative<RotationQuaternion>(*value)) {
@@ -235,7 +236,7 @@ static void loop_frames() {
 }
 
 // reads what the host sends after the start (all of it, so the USB receive buffer never fills up):
-// a SOF sync re-syncs the clock (blocks up to ~1 ms, so one mag sample can be late), a ping is answered right away with
+// a SOF sync re-syncs the clock (blocks up to ~1 ms, so a few mag samples can be late), a ping is answered right away with
 // sof_clock.now() (the host checks that it lies between its send and receive time), everything else is dropped
 static void drain_host() {
 	while (Serial.available() > 0) {
@@ -288,6 +289,6 @@ static void loop_print() {
 }
 
 void loop() {
-	loop_frames();  // binary TemperatureMessage + MagMessage per mag sample (loop_print() is plain text for a serial monitor, the receiver skips it)
+	loop_frames();  // binary MagMessage per mag sample, TemperatureMessage / IMU every 2nd (loop_print() is plain text for a serial monitor, the receiver skips it)
 	drain_host();
 }

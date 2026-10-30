@@ -89,7 +89,7 @@ static MCP9700B temp16(tmp_adc1, ADC_CHANNEL_5);   // PB1
 // SCLK=PE2, DRDY=PE3, CS=PE4, MISO=PE5, MOSI=PE6. One object drives both chips.
 // Arduino pin NUMBERS (PE4, not PE_4): the PinName values are off by 2 on this variant.
 static HalSpi4 spi4;                                               // direct-HAL SPI4 master (SCLK=PE2, MISO=PE5, MOSI=PE6, AF5)
-static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 1 kSPS, 24-bit, VREF=4.096 V
+static ADS131E08<true> mag_adc(spi4, PE4, PE3, PE14, PB10, PB11);  // (spi, CS, DRDY, START, nRESET A, nRESET B), 2 kSPS, 24-bit, VREF=4.096 V
 
 // One FLC100 per channel: (its ADS131E08, channel 0..15). Ch 0..7 = chip 0,
 // ch 8..15 = chip 1 in the daisy chain. B[µT] = 50 * V_adc.
@@ -150,11 +150,11 @@ static void setup_sensors() {
 	tmp_adc1.begin();  // configure/calibrate ADC1 (PA/PC/PB channels) — logs its own steps
 	tmp_adc3.begin();  // configure/calibrate ADC3 (PC2_C/PC3_C pads) — logs its own steps
 
-	{  // how long do all temperature conversions take? (must stay well below the 1 ms mag frame period)
+	{  // how long do all temperature conversions take? (must stay well below the 500 us mag frame period)
 		std::uint64_t const t0 = sof_clock.now();
 		tmp_adc1.read();
 		tmp_adc3.read();
-		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", static_cast<unsigned long>((sof_clock.now() - t0) / 1000), " us (budget: 1000 us per mag frame)");
+		send_info<Crc>("'ADC1+ADC3' all 16 channels: ", static_cast<unsigned long>((sof_clock.now() - t0) / 1000), " us (budget: 500 us per mag frame)");
 	}
 
 	spi4.begin();         // direct-HAL SPI4 master (kernel clock + GPIO AF5 + master init)
@@ -164,7 +164,7 @@ static void setup_sensors() {
 }
 
 // Binary output: one TemperatureMessage and one MagMessage per mag sample, for common::Parser on the host.
-// Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 1 kSPS on its own oscillator): one call ≈ 1 ms.
+// Paced by the ADS131E08 (mag_adc.read() waits for its DRDY, 2 kSPS on its own oscillator): one call ≈ 500 us.
 // measurement_timestamp: host time in ns (sof_clock) when measured, header timestamp: host time (sof_clock) when sent.
 static void loop_frames() {
 	{                     // [T][send time][measurement time][offset][scale][16 x TemperatureDataRaw][crc16][T], T[degC] = datapoint / scale + offset
@@ -272,7 +272,7 @@ void setup() {
 }
 
 void loop() {
-	loop_frames();  // as in the measuring firmware: ~1 ms, paced by the ADS131E08
+	loop_frames();  // as in the measuring firmware: ~500 us, paced by the ADS131E08
 	send_time_compare();
 	drain_host();
 	report_sof_health();

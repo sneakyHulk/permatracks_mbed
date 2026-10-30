@@ -31,8 +31,8 @@
 //
 // Timing rules that bit us and are baked in here:
 //   tSDECODE = 4 tCLK = 1.96 us between bytes of RREG/WREG, else silently ignored
-//   RDATAC frame must be clocked out within one tDR (Eq. 9): 55 B @ 7.5 MHz = 59 us << 1 ms
-//   tSETTLE at 1 kSPS = 9224 tCLK = 4.5 ms after START before the first valid DRDY
+//   RDATAC frame must be clocked out within one tDR (Eq. 9): 55 B @ 7.5 MHz = 59 us << 500 us
+//   tSETTLE at 2 kSPS = 4616 tCLK = 2.3 ms after START before the first valid DRDY (Table 5)
 // -----------------------------------------------------------------------------
 template <bool daisy_chain>
 class ADS131E08 final {
@@ -83,7 +83,7 @@ class ADS131E08 final {
 		initialized = check_device_id();
 		if (!initialized) return;
 
-		// configure: 1 kSPS, 24-bit, external VREF, gain 1, sensor inputs (written to every chip, read back from chip A)
+		// configure: 2 kSPS, 24-bit, external VREF, gain 1, sensor inputs (written to every chip, read back from chip A)
 		initialized = configure(config2_normal, chset_normal);
 		if (!initialized) return;
 
@@ -130,7 +130,7 @@ class ADS131E08 final {
 		common::print_loc(millis(), " ms 'ADS131E08' start conversions (RDATAC, START high)... ");
 		cmd(RDATAC);
 		digitalWrite(start_, HIGH);
-		delay(6);  // > tSETTLE (9224 tCLK = 4.5 ms at 1 kSPS)
+		delay(3);  // > tSETTLE (4616 tCLK = 2.3 ms at 2 kSPS)
 		common::println("Done!");
 	}
 
@@ -219,8 +219,10 @@ class ADS131E08 final {
 
 	// ID bits 7..0: 110 (ADS131E0x) | 10 | 010 (8 channels)
 	static constexpr std::uint8_t expected_id = 0b1101'0010;
-	// CONFIG1 bits 7..0: 1 | DAISY_IN (0 = daisy-chain, 1 = multiple readback) | CLK_EN=0 | 1 | 0 | DR=110 (1 kSPS, 24-bit)
-	static constexpr std::uint8_t config1 = daisy_chain ? 0b1001'0110 : 0b1101'0110;
+	// CONFIG1 bits 7..0: 1 | DAISY_IN (0 = daisy-chain, 1 = multiple readback) | CLK_EN=0 | 1 | 0 | DR=101 (2 kSPS, 24-bit)
+	// sinc3: -3 dB at 524 Hz (-2.7 dB at 500 Hz), notches at 2, 4, 6 kHz: aliases into 0 - 500 Hz (from 1.5 kHz on) >= 31 dB down.
+	// (1 kSPS: -3 dB at 262 Hz, aliases into 450 Hz from 550 Hz only 15 dB down)
+	static constexpr std::uint8_t config1 = daisy_chain ? 0b1001'0101 : 0b1101'0101;
 	// CONFIG2 bits 7..0: 1 1 1 | INT_TEST | 0 | TEST_AMP (0: x1) | TEST_FREQ=00 / 11 (DC)
 	static constexpr std::uint8_t config2_normal = 0b1110'0000;
 	static constexpr std::uint8_t config2_test = 0b1111'0011;
